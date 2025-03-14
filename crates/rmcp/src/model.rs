@@ -17,10 +17,10 @@ pub type JsonObject<F = Value> = serde_json::Map<String, F>;
 #[cfg_attr(feature = "default-json-schema", derive(schemars::JsonSchema))]
 pub struct EmptyObject {}
 
-pub trait ConstString {
+pub trait ConstString: Default {
     const VALUE: &str;
 }
-
+#[macro_export]
 macro_rules! const_string {
     ($name:ident = $value:literal) => {
         #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
@@ -30,7 +30,7 @@ macro_rules! const_string {
             const VALUE: &str = $value;
         }
 
-        impl Serialize for $name {
+        impl serde::Serialize for $name {
             fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
             where
                 S: serde::Serializer,
@@ -39,12 +39,12 @@ macro_rules! const_string {
             }
         }
 
-        impl<'de> Deserialize<'de> for $name {
+        impl<'de> serde::Deserialize<'de> for $name {
             fn deserialize<D>(deserializer: D) -> Result<$name, D::Error>
             where
                 D: serde::Deserializer<'de>,
             {
-                let s: String = Deserialize::deserialize(deserializer)?;
+                let s: String = serde::Deserialize::deserialize(deserializer)?;
                 if s == $value {
                     Ok($name)
                 } else {

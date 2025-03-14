@@ -9,7 +9,7 @@ pub struct GetWeatherRequest {
     pub date: String,
 }
 
-#[tool(GET_WEATHER)]
+// #[tool(GET_WEATHER)]
 pub async fn get_weather(request: GetWeatherRequest) -> String {
     "rain".to_string()
 }

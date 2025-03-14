@@ -1,10 +1,7 @@
 use std::{borrow::Cow, sync::Arc};
 
 use rmcp::{
-    Error as McpError, RoleServer, ServerHandler,
-    handler::server::tool::{ToolSet, ToolTrait},
-    model::*,
-    service::RequestContext,
+    const_string, handler::server::{tool::{ToolSet, ToolTrait}, tool_v2::{Callee, Parameter, ToolCallContext}}, model::*, service::RequestContext, Error as McpError, RoleServer, ServerHandler
 };
 
 use serde_json::json;
@@ -12,7 +9,7 @@ use tokio::sync::Mutex;
 
 #[derive(Clone)]
 pub struct Counter {
-    _counter: Arc<Mutex<i32>>,
+    counter: Arc<Mutex<i32>>,
     tool_set: Arc<ToolSet>,
 }
 
@@ -90,7 +87,7 @@ impl Counter {
         tool_set.add_tool(DecrementTool(counter.clone()));
         tool_set.add_tool(GetValueTool(counter.clone()));
         Self {
-            _counter: Arc::new(Mutex::new(0)),
+            counter: Arc::new(Mutex::new(0)),
             tool_set: Arc::new(tool_set),
         }
     }
@@ -98,8 +95,44 @@ impl Counter {
     fn _create_resource_text(&self, uri: &str, name: &str) -> Resource {
         RawResource::new(uri, name.to_string()).no_annotation()
     }
-}
 
+    async fn increment(&self) -> Result<CallToolResult, McpError> {
+        let mut counter = self.counter.lock().await;
+        *counter += 1;
+        Ok(CallToolResult::success(vec![Content::text(
+            counter.to_string(),
+        )]))
+    }
+
+    async fn decrement(&self) -> Result<CallToolResult, McpError> {
+        let mut counter = self.counter.lock().await;
+        *counter -= 1;
+        Ok(CallToolResult::success(vec![Content::text(
+            counter.to_string(),
+        )]))
+    }
+
+    async fn get_value(&self) -> Result<CallToolResult, McpError> {
+        let mut counter = self.counter.lock().await;
+        *counter -= 1;
+        Ok(CallToolResult::success(vec![Content::text(
+            counter.to_string(),
+        )]))
+    }
+
+    fn say_hello(&self) -> Result<CallToolResult, McpError> {
+        Ok(CallToolResult::success(vec![Content::text(
+            "hello"
+        )]))
+    }
+
+    fn echo(&self, Parameter(Echo, echo): Parameter<Echo, String>) -> Result<CallToolResult, McpError> {
+        Ok(CallToolResult::success(vec![Content::text(
+            echo
+        )]))
+    }
+}
+const_string!(Echo = "echo");
 impl ServerHandler for Counter {
     fn get_info(&self) -> ServerInfo {
         ServerInfo {
@@ -131,10 +164,18 @@ impl ServerHandler for Counter {
 
     async fn call_tool(
         &self,
-        CallToolRequestParam { name, arguments }: CallToolRequestParam,
-        _context: RequestContext<RoleServer>,
+        call_tool_request_param: CallToolRequestParam,
+        context: RequestContext<RoleServer>,
     ) -> Result<CallToolResult, McpError> {
-        self.tool_set.call(&name, arguments).await
+        let context = ToolCallContext::new(self, call_tool_request_param, context);
+        match context.name() {
+            "increment" => context.invoke(Self::increment).await,
+            "decrement" => context.invoke(Self::decrement).await,
+            "get_value" => context.invoke(Self::get_value).await,
+            "say_hello" => context.invoke(Self::say_hello).await,
+            "echo" => context.invoke(Self::echo).await,
+            _ => Err(McpError::method_not_found::<CallToolRequestMethod>()),
+        }
     }
 
     async fn list_resources(
@@ -227,4 +268,5 @@ impl ServerHandler for Counter {
             resource_templates: Vec::new(),
         })
     }
+
 }

@@ -3,7 +3,7 @@ use crate::model::*;
 use crate::service::{Peer, RequestContext, RoleServer, Service, ServiceRole};
 
 pub mod tool;
-
+pub mod tool_v2;
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
 pub struct ServerHandlerService<H> {
     pub handler: H,
