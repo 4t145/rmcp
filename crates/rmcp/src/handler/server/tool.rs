@@ -1,5 +1,6 @@
 use std::borrow::Borrow;
 use std::collections::HashMap;
+use std::marker::PhantomData;
 use std::{borrow::Cow, future::Future, ops::Deref, pin::Pin};
 
 use serde::de::DeserializeOwned;
@@ -7,6 +8,16 @@ use serde_json::Value;
 
 use crate::error::Error as McpError;
 use crate::model::{CallToolResult, JsonObject, Tool};
+
+#[cfg(not(feature = "default-json-schema"))]
+pub trait OptionalJsonSchema {}
+#[cfg(not(feature = "default-json-schema"))]
+impl<T> OptionalJsonSchema for T {}
+
+#[cfg(feature = "default-json-schema")]
+pub trait OptionalJsonSchema: schemars::JsonSchema {}
+#[cfg(feature = "default-json-schema")]
+impl<T> OptionalJsonSchema for T where T: schemars::JsonSchema {}
 
 /// Trait for implementing MCP tools
 pub trait DynTool: Send + Sync {
@@ -28,11 +39,8 @@ pub trait DynTool: Send + Sync {
 
 /// Trait for implementing MCP tools with specified types
 pub trait ToolTrait: Send + Sync {
-    #[cfg(feature = "default-json-schema")]
-    type Params: DeserializeOwned + schemars::JsonSchema;
+    type Params: DeserializeOwned + OptionalJsonSchema;
 
-    #[cfg(not(feature = "default-json-schema"))]
-    type Params: DeserializeOwned;
     /// The name of the tool
     fn name(&self) -> Cow<'static, str>;
 
@@ -57,7 +65,7 @@ pub trait ToolTrait: Send + Sync {
     fn call(
         &self,
         params: Self::Params,
-    ) -> impl Future<Output = Result<CallToolResult, McpError>> + Send;
+    ) -> impl Future<Output = Result<CallToolResult, McpError>> + Send + '_;
 }
 
 #[derive(Debug, Clone, Default, Copy, PartialEq, Eq, Hash)]
@@ -181,3 +189,78 @@ impl ToolSet {
             .collect()
     }
 }
+
+#[cfg(feature = "default-json-schema")]
+mod function_tool {
+    use super::*;
+    pub struct FunctionalTool<A, F> {
+        pub name: Cow<'static, str>,
+        pub description: Cow<'static, str>,
+        pub function: F,
+        _marker_adapter: std::marker::PhantomData<A>,
+    }
+    
+    
+    impl<A, F> FunctionalTool<A, F> {
+        pub const fn new(
+            name: Cow<'static, str>,
+            description: Cow<'static, str>,
+            function: F,
+        ) -> Self {
+            Self {
+                name,
+                description,
+                function,
+                _marker_adapter: PhantomData,
+            }
+        }
+    }
+
+    impl<F, I, O, Fut: Future<Output = O>> FunctionalTool<_AdapterAsyncSingleParam<I, O, Fut>, F> {
+        pub const fn new_async_single_param(
+            name: Cow<'static, str>,
+            description: Cow<'static, str>,
+            function: F,
+        ) -> Self {
+            Self {
+                name,
+                description,
+                function,
+                _marker_adapter: PhantomData,
+            }
+        }
+    }
+
+    pub struct _AdapterAsyncSingleParam<I, O, Fut: Future<Output = O>>(PhantomData<fn(I) -> Fut>);
+    
+    impl<F, I, Fut, O> ToolTrait for FunctionalTool<_AdapterAsyncSingleParam<I, O, Fut>, F>
+    where
+        F: (FnOnce(I) -> Fut) + Sync + Send + Clone,
+        I: DeserializeOwned + Send + OptionalJsonSchema,
+        Fut: Future<Output = O> + Send,
+        O: Into<CallToolResult>,
+    {
+        type Params = I;
+    
+        fn name(&self) -> Cow<'static, str> {
+            self.name.clone()
+        }
+    
+        fn description(&self) -> Cow<'static, str> {
+            self.description.clone()
+        }
+    
+        fn call(
+            &self,
+            params: Self::Params,
+        ) -> impl Future<Output = Result<CallToolResult, McpError>> + Send + '_ {
+            let function = self.function.clone();
+            async {
+                let result = (function)(params).await;
+                Ok(result.into())
+            }
+        }
+    }
+}
+#[cfg(feature = "default-json-schema")]
+pub use function_tool::*;

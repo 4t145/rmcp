@@ -4,6 +4,7 @@ use std::marker::PhantomData;
 use futures::{Sink, SinkExt, Stream, StreamExt};
 use serde::{Serialize, de::DeserializeOwned};
 use thiserror::Error;
+
 use tokio::io::{AsyncRead, AsyncWrite};
 use tokio_util::{
     bytes::{Buf, BufMut, BytesMut},
@@ -11,6 +12,8 @@ use tokio_util::{
 };
 
 use super::Transport;
+#[cfg(target_os="wasi")]
+pub mod wasip1;
 
 pub fn async_rw<I, O, R, W>(
     read: R,

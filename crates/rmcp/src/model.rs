@@ -686,7 +686,7 @@ pub enum Role {
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 pub struct SamplingMessage {
     pub role: Role,
-    pub content: RawContent,
+    pub content: Content,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
@@ -802,16 +802,22 @@ pub type RootsListChangedNotification = NotificationNoParam<RootsListChangedNoti
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct CallToolResult {
-    pub content: Vec<RawContent>,
+    pub content: Vec<Content>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub is_error: Option<bool>,
 }
 
 impl CallToolResult {
-    pub fn success(content: Vec<RawContent>) -> Self {
+    pub fn success(content: Vec<Content>) -> Self {
         CallToolResult {
             content,
             is_error: Some(false),
+        }
+    }
+    pub fn error(content: Vec<Content>) -> Self {
+        CallToolResult {
+            content,
+            is_error: Some(true),
         }
     }
 }

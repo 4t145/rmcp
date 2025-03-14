@@ -32,17 +32,33 @@ reqwest = { version = "0.12", default-features = false, features = [
 ], optional = true  }
 eventsource-client = { version = "0.14.0", optional = true }
 
+
+rmcp-macros = { version = "0.1", workspace = true }
+# for WASI
+# [target.'cfg(target_arch="wasip2")'.dependencies]
+wasi = "0.11.0+wasi-snapshot-preview1"
+
+
 [features]
 default = ["default-json-schema", "base64"]
-client = ["transport-child-process"]
+client = []
 server = ["transport-io"]
 
 transport-sse = ["dep:reqwest", "dep:eventsource-client"]
-transport-io = ["tokio/io-util", "tokio-util/codec", "tokio-util/io"]
+transport-io = ["tokio/io-util", "tokio-util/codec"]
 transport-child-process = ["transport-io"]
 default-json-schema = ["dep:schemars"]
 
 [dev-dependencies]
-tempfile = "3.8"
 tokio = { version = "1", features = ["sync", "macros", "io-util", "rt"] }
+schemars = { version = "0.8" }
+
 anyhow = "1.0"
+
+[build]
+target = ["x86_64-unknown-linux-gnu", "i686-unknown-linux-gnu", "wasm32-wasip1"]
+
+[[tests]]
+name = "test_tool_macros"
+required-features = ["server"]
+path = "tests/test_tool_macros.rs"

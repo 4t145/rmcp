@@ -1,0 +1,19 @@
+[package]
+name = "rmcp-macros"
+edition.workspace = true
+version.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+description.workspace = true
+
+[lib]
+proc-macro = true
+
+[dependencies]
+syn = "2"
+quote = "1"
+proc-macro2 = "1"
+darling = "0.20.10"
+
+[dev-dependencies]

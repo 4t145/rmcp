@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-use super::{Annotatable, Annotated};
+use super::Annotated;
 
 /// Represents a resource in the extension with metadata
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
@@ -23,7 +23,7 @@ pub struct RawResource {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub size: Option<u32>,
 }
-impl Annotatable for RawResource {}
+
 pub type Resource = Annotated<RawResource>;
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]

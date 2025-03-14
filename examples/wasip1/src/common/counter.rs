@@ -32,7 +32,7 @@ impl ToolTrait for IncrementTool {
     async fn call(&self, _params: Self::Params) -> Result<CallToolResult, McpError> {
         let mut counter = self.0.lock().await;
         *counter += 1;
-        Ok(CallToolResult::success(vec![Content::text(
+        Ok(CallToolResult::success(vec![RawContent::text(
             counter.to_string(),
         )]))
     }
@@ -54,7 +54,7 @@ impl ToolTrait for DecrementTool {
     async fn call(&self, _params: Self::Params) -> Result<CallToolResult, McpError> {
         let mut counter = self.0.lock().await;
         *counter -= 1;
-        Ok(CallToolResult::success(vec![Content::text(
+        Ok(CallToolResult::success(vec![RawContent::text(
             counter.to_string(),
         )]))
     }
@@ -75,7 +75,7 @@ impl ToolTrait for GetValueTool {
 
     async fn call(&self, _params: Self::Params) -> Result<CallToolResult, McpError> {
         let counter = self.0.lock().await;
-        Ok(CallToolResult::success(vec![Content::text(
+        Ok(CallToolResult::success(vec![RawContent::text(
             counter.to_string(),
         )]))
     }
@@ -142,6 +142,7 @@ impl ServerHandler for Counter {
         _request: PaginatedRequestParam,
         _: RequestContext<RoleServer>,
     ) -> Result<ListResourcesResult, McpError> {
+        tracing::info!("list resource");
         Ok(ListResourcesResult {
             resources: vec![
                 self._create_resource_text("str:////Users/to/some/path/", "cwd"),

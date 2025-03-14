@@ -233,6 +233,36 @@ pub struct RequestContext<R: ServiceRole> {
     pub peer: Peer<R>,
 }
 
+
+/// Use this function to skip initialization process
+pub async fn serve_directly<S, T, E>(
+    service: S,
+    transport: T,
+    peer_info: <S::Role as ServiceRole>::PeerInfo,
+) -> Result<RunningService<S>, E>
+where
+    S: Service,
+    T: Stream<
+            Item = JsonRpcMessage<
+                <S::Role as ServiceRole>::PeerReq,
+                <S::Role as ServiceRole>::PeerResp,
+                <S::Role as ServiceRole>::PeerNot,
+            >,
+        > + Sink<
+            JsonRpcMessage<
+                <S::Role as ServiceRole>::Req,
+                <S::Role as ServiceRole>::Resp,
+                <S::Role as ServiceRole>::Not,
+            >,
+            Error = E,
+        > + Send
+        + Unpin
+        + 'static,
+    E: std::error::Error + Send + Sync + 'static,
+{
+    serve_inner(service, transport, async |_, _, _| Ok(peer_info)).await
+}
+
 async fn serve_inner<S, T, E>(
     mut service: S,
     mut transport: T,
@@ -296,7 +326,7 @@ where
     let (mut sink, mut stream) = transport.split();
     let ct = CancellationToken::new();
     let serve_loop_ct = ct.child_token();
-    let peer_return = peer.clone();
+    let peer_return: Peer<<S as Service>::Role> = peer.clone();
     let handle = tokio::spawn(async move {
         #[derive(Debug)]
         enum Event<P, R, T> {

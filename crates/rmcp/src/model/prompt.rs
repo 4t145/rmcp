@@ -1,6 +1,6 @@
 use super::content::{EmbeddedResource, ImageContent};
 use super::resource::ResourceContents;
-use super::{Annotatable, Annotations, RawEmbeddedResource, RawImageContent};
+use super::{AnnotateAble, Annotations, RawEmbeddedResource, RawImageContent};
 use base64::engine::{Engine, general_purpose::STANDARD as BASE64_STANDARD};
 use serde::{Deserialize, Serialize};
 

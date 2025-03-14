@@ -6,7 +6,7 @@ publish = false
 
 [dependencies]
 rmcp= { path = "../../crates/rmcp", features = ["server"] }
-tokio = { version = "1", features = ["full"] }
+tokio = { version = "1", features = ["macros", "rt", "rt-multi-thread", "io-std"] }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 anyhow = "1.0"
@@ -16,14 +16,16 @@ tracing-subscriber = { version = "0.3", features = [
     "std",
     "fmt",
 ] }
-tracing-appender = "0.2"
 futures = "0.3"
+rand = { version = "0.8" }
+axum = { version = "0.8", features = ["macros"] }
+
+# [dev-dependencies.'cfg(target_arch="linux")'.dependencies]
 
 [dev-dependencies]
-axum = { version = "0.8", features = ["macros"] }
 tokio-stream = { version = "0.1" }
-tokio-util = { version = "0.7", features = ["io", "codec"] }
-rand = { version = "0.8" }
+# tokio-util = { version = "0.7", features = ["io", "codec"] }
+tokio-util = { version = "0.7", features = ["codec"] }
 
 [[example]]
 name = "std_io"

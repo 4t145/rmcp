@@ -17,3 +17,5 @@ pub use handler::server::{ServerHandler, ServerHandlerService};
 
 pub mod handler;
 pub mod transport;
+
+pub use rmcp_macros::*;
