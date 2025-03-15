@@ -83,6 +83,21 @@ impl IntoCallToolResult for () {
     }
 }
 
+impl<T: IntoContents> IntoCallToolResult for T {
+    fn into_call_tool_result(self) -> Result<CallToolResult, crate::Error> {
+        Ok(CallToolResult::success(self.into_contents()))
+    }
+}
+
+impl<T: IntoContents, E: IntoContents> IntoCallToolResult for Result<T, E> {
+    fn into_call_tool_result(self) -> Result<CallToolResult, crate::Error> {
+        match self {
+            Ok(value) => Ok(CallToolResult::success(value.into_contents())),
+            Err(error) => Ok(CallToolResult::error(error.into_contents())),
+        }
+    }
+}
+
 pin_project_lite::pin_project! {
     #[project = IntoCallToolResultFutProj]
     pub enum IntoCallToolResultFut<F, R> {
