@@ -1,3 +1,5 @@
+//! DEPRECATED DESIGN
+
 use std::borrow::Borrow;
 use std::collections::HashMap;
 use std::marker::PhantomData;
@@ -102,7 +104,7 @@ impl dyn DynTool {
         Tool {
             name: self.name().clone(),
             description: self.description().clone(),
-            input_schema: self.schema(),
+            input_schema: self.schema().into(),
         }
     }
 }

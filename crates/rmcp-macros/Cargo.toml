@@ -11,9 +11,10 @@ description.workspace = true
 proc-macro = true
 
 [dependencies]
-syn = "2"
+syn = {version = "2", features = ["full"]}
 quote = "1"
 proc-macro2 = "1"
-darling = "0.20.10"
 
+
+[features]
 [dev-dependencies]

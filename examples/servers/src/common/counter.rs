@@ -1,7 +1,17 @@
-use std::{borrow::Cow, sync::Arc};
+use std::{
+    borrow::Cow,
+    sync::{Arc, OnceLock},
+};
 
 use rmcp::{
-    const_string, handler::server::{tool::{ToolSet, ToolTrait}, tool_v2::{Callee, Parameter, ToolCallContext}}, model::*, service::RequestContext, Error as McpError, RoleServer, ServerHandler
+    Error as McpError, RoleServer, ServerHandler, const_string,
+    handler::server::{
+        tool_v1::{ToolSet, ToolTrait},
+        tool_v2::{Callee, Parameter, ToolCallContext},
+    },
+    model::*,
+    service::RequestContext,
+    tool,
 };
 
 use serde_json::json;
@@ -10,85 +20,14 @@ use tokio::sync::Mutex;
 #[derive(Clone)]
 pub struct Counter {
     counter: Arc<Mutex<i32>>,
-    tool_set: Arc<ToolSet>,
-}
-
-pub struct IncrementTool(Arc<Mutex<i32>>);
-
-impl ToolTrait for IncrementTool {
-    type Params = EmptyObject;
-
-    fn name(&self) -> Cow<'static, str> {
-        "increment".into()
-    }
-
-    fn description(&self) -> Cow<'static, str> {
-        "Increment the counter by 1".into()
-    }
-
-    async fn call(&self, _params: Self::Params) -> Result<CallToolResult, McpError> {
-        let mut counter = self.0.lock().await;
-        *counter += 1;
-        Ok(CallToolResult::success(vec![Content::text(
-            counter.to_string(),
-        )]))
-    }
-}
-
-pub struct DecrementTool(Arc<Mutex<i32>>);
-
-impl ToolTrait for DecrementTool {
-    type Params = EmptyObject;
-
-    fn name(&self) -> Cow<'static, str> {
-        "decrement".into()
-    }
-
-    fn description(&self) -> Cow<'static, str> {
-        "Decrement the counter by 1".into()
-    }
-
-    async fn call(&self, _params: Self::Params) -> Result<CallToolResult, McpError> {
-        let mut counter = self.0.lock().await;
-        *counter -= 1;
-        Ok(CallToolResult::success(vec![Content::text(
-            counter.to_string(),
-        )]))
-    }
-}
-
-pub struct GetValueTool(Arc<Mutex<i32>>);
-
-impl ToolTrait for GetValueTool {
-    type Params = EmptyObject;
-
-    fn name(&self) -> Cow<'static, str> {
-        "get_value".into()
-    }
-
-    fn description(&self) -> Cow<'static, str> {
-        "Get the current counter value".into()
-    }
-
-    async fn call(&self, _params: Self::Params) -> Result<CallToolResult, McpError> {
-        let counter = self.0.lock().await;
-        Ok(CallToolResult::success(vec![Content::text(
-            counter.to_string(),
-        )]))
-    }
 }
 
 impl Counter {
     pub fn new() -> Self {
-        let mut tool_set = ToolSet::default();
         let counter = Arc::new(Mutex::new(0));
 
-        tool_set.add_tool(IncrementTool(counter.clone()));
-        tool_set.add_tool(DecrementTool(counter.clone()));
-        tool_set.add_tool(GetValueTool(counter.clone()));
         Self {
             counter: Arc::new(Mutex::new(0)),
-            tool_set: Arc::new(tool_set),
         }
     }
 
@@ -96,6 +35,7 @@ impl Counter {
         RawResource::new(uri, name.to_string()).no_annotation()
     }
 
+    #[tool(description = "Increment the counter by 1")]
     async fn increment(&self) -> Result<CallToolResult, McpError> {
         let mut counter = self.counter.lock().await;
         *counter += 1;
@@ -104,6 +44,7 @@ impl Counter {
         )]))
     }
 
+    #[tool(description = "Decrement the counter by 1")]
     async fn decrement(&self) -> Result<CallToolResult, McpError> {
         let mut counter = self.counter.lock().await;
         *counter -= 1;
@@ -112,6 +53,7 @@ impl Counter {
         )]))
     }
 
+    #[tool(description = "Get the current counter value")]
     async fn get_value(&self) -> Result<CallToolResult, McpError> {
         let mut counter = self.counter.lock().await;
         *counter -= 1;
@@ -120,17 +62,28 @@ impl Counter {
         )]))
     }
 
+    #[tool(description = "Say hello to the client")]
     fn say_hello(&self) -> Result<CallToolResult, McpError> {
-        Ok(CallToolResult::success(vec![Content::text(
-            "hello"
-        )]))
+        Ok(CallToolResult::success(vec![Content::text("hello")]))
     }
 
-    fn echo(&self, Parameter(Echo, echo): Parameter<Echo, String>) -> Result<CallToolResult, McpError> {
-        Ok(CallToolResult::success(vec![Content::text(
-            echo
-        )]))
+    #[tool(description = "Repeat what you say")]
+    fn echo(&self, #[tool(param)] saying: String) -> Result<CallToolResult, McpError> {
+        Ok(CallToolResult::success(vec![Content::text(saying)]))
     }
+
+    // pub fn tool_box() -> &'static ToolBox<Counter> {
+    //     static TOOL_BOX: OnceLock<ToolBox<Counter>> = OnceLock::new();
+    //     TOOL_BOX.get_or_init(|| {
+    //         let mut tool_box = ToolBox::new();
+    //         tool_box.add(Self::increment_tool_attr(), Self::increment);
+    //         // tool_box.add(Self::decrement_tool_attr(), Self::decrement);
+    //         // tool_box.add(Self::get_value_tool_attr(), Self::get_value);
+    //         // tool_box.add(Self::say_hello_tool_attr(), Self::say_hello);
+    //         // tool_box.add(Self::echo_tool_attr(), Self::echo_call);
+    //         tool_box
+    //     })
+    // }
 }
 const_string!(Echo = "echo");
 impl ServerHandler for Counter {
@@ -150,15 +103,22 @@ impl ServerHandler for Counter {
             instructions: Some("This server provides a counter tool that can increment and decrement values. The counter starts at 0 and can be modified using the 'increment' and 'decrement' tools. Use 'get_value' to check the current count.".to_string()),
         }
     }
+
     async fn list_tools(
         &self,
         _request: PaginatedRequestParam,
         _: RequestContext<RoleServer>,
     ) -> Result<ListToolsResult, McpError> {
-        let tools = self.tool_set.list_all();
+        let tools = vec![
+            Self::increment_tool_attr(),
+            Self::decrement_tool_attr(),
+            Self::get_value_tool_attr(),
+            Self::say_hello_tool_attr(),
+            Self::echo_tool_attr(),
+        ];
         Ok(ListToolsResult {
             next_cursor: None,
-            tools,
+            tools
         })
     }
 
@@ -167,14 +127,57 @@ impl ServerHandler for Counter {
         call_tool_request_param: CallToolRequestParam,
         context: RequestContext<RoleServer>,
     ) -> Result<CallToolResult, McpError> {
+        static TOOL_STATIC_ROOTER: std::sync::OnceLock<
+            std::collections::HashMap<
+                String,
+                Box<
+                    dyn for<'a> Fn(
+                            ToolCallContext<'a, Counter>,
+                        ) -> std::pin::Pin<
+                            std::boxed::Box<
+                                dyn Future<Output = Result<CallToolResult, McpError>> + Send + 'a,
+                            >,
+                        > + Send
+                        + Sync,
+                >,
+            >,
+        > = std::sync::OnceLock::new();
+        let map = TOOL_STATIC_ROOTER.get_or_init(|| {
+            let mut map = <std::collections::HashMap<
+                String,
+                Box<
+                    dyn for<'a> Fn(
+                            ToolCallContext<'a, Counter>,
+                        ) -> std::pin::Pin<
+                            std::boxed::Box<
+                                dyn Future<
+                                        Output = Result<rmcp::model::CallToolResult, rmcp::Error>,
+                                    > + Send
+                                    + 'a,
+                            >,
+                        > + Send
+                        + Sync,
+                >,
+            >>::new();
+            map.insert(
+                "increment".to_string(),
+                Box::new(|context: ToolCallContext<'_, Counter>| {
+                    Box::pin(context.invoke(Self::increment))
+                }),
+            );
+            map.insert(
+                "decrement".to_string(),
+                Box::new(|context: ToolCallContext<'_, Counter>| {
+                    Box::pin(context.invoke(Self::decrement))
+                }),
+            );
+            map
+        });
         let context = ToolCallContext::new(self, call_tool_request_param, context);
-        match context.name() {
-            "increment" => context.invoke(Self::increment).await,
-            "decrement" => context.invoke(Self::decrement).await,
-            "get_value" => context.invoke(Self::get_value).await,
-            "say_hello" => context.invoke(Self::say_hello).await,
-            "echo" => context.invoke(Self::echo).await,
-            _ => Err(McpError::method_not_found::<CallToolRequestMethod>()),
+        if let Some(caller) = map.get(context.name()) {
+            (caller)(context).await
+        } else {
+            Err(McpError::invalid_params("method not found", None))
         }
     }
 
@@ -268,5 +271,4 @@ impl ServerHandler for Counter {
             resource_templates: Vec::new(),
         })
     }
-
 }

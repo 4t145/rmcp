@@ -1,3 +1,4 @@
+#[allow(unused_imports)]
 use proc_macro::TokenStream;
 
 mod tool;

@@ -8,7 +8,7 @@ description = "Rust SDK for Model Context Protocol"
 
 
 [dependencies]
-serde = { version = "1.0", features = ["derive"] }
+serde = { version = "1.0", features = ["derive", "rc"] }
 serde_json = "1.0"
 thiserror = "2"
 chrono = { version = "0.4.38", features = ["serde"] }
@@ -33,17 +33,17 @@ reqwest = { version = "0.12", default-features = false, features = [
 eventsource-client = { version = "0.14.0", optional = true }
 
 
-rmcp-macros = { version = "0.1", workspace = true }
+rmcp-macros = { version = "0.1", workspace = true, optional = true }
 # for WASI
 # [target.'cfg(target_arch="wasip2")'.dependencies]
 wasi = "0.11.0+wasi-snapshot-preview1"
 
 
 [features]
-default = ["default-json-schema", "base64"]
+default = ["default-json-schema", "base64", "macros", "server"]
 client = []
 server = ["transport-io"]
-
+macros = ["dep:rmcp-macros"]
 transport-sse = ["dep:reqwest", "dep:eventsource-client"]
 transport-io = ["tokio/io-util", "tokio-util/codec"]
 transport-child-process = ["transport-io"]

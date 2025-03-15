@@ -1,5 +1,6 @@
-use std::{borrow::Cow, future::Ready, marker::PhantomData};
+use std::{borrow::Cow, future::Ready, marker::PhantomData, sync::{Arc, OnceLock}};
 
+use futures::future::BoxFuture;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize, de::DeserializeOwned};
 use tokio_util::sync::CancellationToken;
@@ -10,7 +11,33 @@ use crate::{
     service::RequestContext,
 };
 pub struct ToolV2 {}
+/// A shortcut for generating a JSON schema for a type.
+pub fn schema_for_type<T: JsonSchema>() -> JsonObject {
+    let schema = T::json_schema(&mut schemars::SchemaGenerator::default());
+    let object = serde_json::to_value(schema).expect("failed to serialize schema");
+    match object {
+        serde_json::Value::Object(object) => object,
+        _ => panic!("unexpected schema value"),
+    }
+}
 
+/// Call [`schema_for_type`] with a cache
+pub fn cached_schema_for_type<T: JsonSchema>() -> Arc<JsonObject> {
+    static CACHE_FOR_TYPE: OnceLock<Arc<JsonObject>> = OnceLock::new();
+    CACHE_FOR_TYPE
+        .get_or_init(|| Arc::new(schema_for_type::<T>()))
+        .clone()
+}
+
+/// Deserialize a JSON object into a type
+pub fn parse_json_object<T: DeserializeOwned>(input: JsonObject) -> Result<T, crate::Error> {
+    serde_json::from_value(serde_json::Value::Object(input)).map_err(|e| {
+        crate::Error::invalid_params(
+            format!("failed to deserialize parameters: {error}", error = e),
+            None,
+        )
+    })
+}
 pub struct ToolCallContext<'service, S> {
     request_context: RequestContext<RoleServer>,
     service: &'service S,
@@ -298,3 +325,58 @@ macro_rules! impl_for {
 
 }
 impl_for!(T0 T1 T2 T3 T4 T5 T6 T7 T8 T9 T10 T11 T12 T13 T14 T15);
+struct ToolBoxItem<S> {
+    #[allow(clippy::type_complexity)]
+    call: Box<
+        dyn Fn(ToolCallContext<'_, S>) -> BoxFuture<'_, Result<CallToolResult, crate::Error>>
+            + Send
+            + Sync,
+    >,
+    attr: crate::model::Tool,
+}
+
+#[derive(Default)]
+pub struct ToolBox<S> {
+    #[allow(clippy::type_complexity)]
+    map: std::collections::HashMap<Cow<'static, str>, ToolBoxItem<S>>,
+}
+impl<S> ToolBox<S> {
+    pub fn new() -> Self {
+        Self {
+            map: std::collections::HashMap::new(),
+        }
+    }
+    pub fn add<H, A>(&mut self, attr: crate::model::Tool, handler: H)
+    where
+        H: for<'A> CallToolHandler<'A, S, A> + Send + Sync + Clone + 'static,
+        A: 'static
+    {
+        self.map.insert(
+            attr.name.clone(),
+            ToolBoxItem {
+                call: Box::new(move |context: ToolCallContext<'_, S>| {
+                    Box::pin(handler.clone().call(context))
+                }),
+                attr,
+            },
+        );
+    }
+    pub fn remove<H, A>(&mut self, name: &str) {
+        self.map.remove(name);
+    }
+
+    pub async fn call(
+        &self,
+        context: ToolCallContext<'_, S>,
+    ) -> Result<CallToolResult, crate::Error> {
+        let item = self
+            .map
+            .get(context.name())
+            .ok_or_else(|| crate::Error::invalid_params("tool not found", None))?;
+        (item.call)(context).await
+    }
+
+    pub fn list(&self) -> Vec<crate::model::Tool> {
+        self.map.values().map(|item| item.attr.clone()).collect()
+    }
+}
