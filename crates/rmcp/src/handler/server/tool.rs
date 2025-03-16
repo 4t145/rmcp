@@ -1,4 +1,9 @@
-use std::{borrow::Cow, future::Ready, marker::PhantomData, sync::{Arc, OnceLock}};
+use std::{
+    borrow::Cow,
+    future::Ready,
+    marker::PhantomData,
+    sync::{Arc, OnceLock},
+};
 
 use futures::future::BoxFuture;
 use schemars::JsonSchema;
@@ -144,6 +149,9 @@ pub trait CallToolHandler<'a, S, A> {
     fn call(self, context: ToolCallContext<'a, S>) -> Self::Fut;
 }
 
+pub type DynCallToolHanlder<S> = dyn Fn(ToolCallContext<'_, S>) -> BoxFuture<'_, Result<CallToolResult, crate::Error>>
+    + Send
+    + Sync;
 /// Parameter Extractor
 pub struct Parameter<K: ConstString, V>(pub K, pub V);
 
@@ -181,7 +189,6 @@ impl<'a, S> FromToolCallContextPart<'a, S> for Callee<'a, S> {
         Ok((Callee(context.service), context))
     }
 }
-
 
 pub struct ToolName(pub Cow<'static, str>);
 
@@ -250,6 +257,15 @@ where
                 )
             })?;
         Ok((Parameters(value), context))
+    }
+}
+
+impl<'a, S> FromToolCallContextPart<'a, S> for JsonObject {
+    fn from_tool_call_context_part(
+        mut context: ToolCallContext<'a, S>,
+    ) -> Result<(Self, ToolCallContext<'a, S>), crate::Error> {
+        let object = context.arguments.take().unwrap_or_default();
+        Ok((object, context))
     }
 }
 
@@ -340,42 +356,46 @@ macro_rules! impl_for {
 
 }
 impl_for!(T0 T1 T2 T3 T4 T5 T6 T7 T8 T9 T10 T11 T12 T13 T14 T15);
-struct ToolBoxItem<S> {
+pub struct ToolBoxItem<S> {
     #[allow(clippy::type_complexity)]
-    call: Box<
-        dyn Fn(ToolCallContext<'_, S>) -> BoxFuture<'_, Result<CallToolResult, crate::Error>>
+    pub call: Box<DynCallToolHanlder<S>>,
+    pub attr: crate::model::Tool,
+}
+
+impl<S: Send + Sync + 'static + Clone> ToolBoxItem<S> {
+    pub fn new<C>(attr: crate::model::Tool, call: C) -> Self
+    where
+        C: Fn(ToolCallContext<'_, S>) -> BoxFuture<'_, Result<CallToolResult, crate::Error>>
             + Send
-            + Sync,
-    >,
-    attr: crate::model::Tool,
+            + Sync
+            + 'static,
+    {
+        Self {
+            call: Box::new(call),
+            attr,
+        }
+    }
+    pub fn name(&self) -> &str {
+        &self.attr.name
+    }
 }
 
 #[derive(Default)]
 pub struct ToolBox<S> {
     #[allow(clippy::type_complexity)]
-    map: std::collections::HashMap<Cow<'static, str>, ToolBoxItem<S>>,
+    pub map: std::collections::HashMap<Cow<'static, str>, ToolBoxItem<S>>,
 }
+
 impl<S> ToolBox<S> {
     pub fn new() -> Self {
         Self {
             map: std::collections::HashMap::new(),
         }
     }
-    pub fn add<H, A>(&mut self, attr: crate::model::Tool, handler: H)
-    where
-        H: for<'A> CallToolHandler<'A, S, A> + Send + Sync + Clone + 'static,
-        A: 'static
-    {
-        self.map.insert(
-            attr.name.clone(),
-            ToolBoxItem {
-                call: Box::new(move |context: ToolCallContext<'_, S>| {
-                    Box::pin(handler.clone().call(context))
-                }),
-                attr,
-            },
-        );
+    pub fn add(&mut self, item: ToolBoxItem<S>) {
+        self.map.insert(item.attr.name.clone(), item);
     }
+
     pub fn remove<H, A>(&mut self, name: &str) {
         self.map.remove(name);
     }
@@ -393,5 +413,49 @@ impl<S> ToolBox<S> {
 
     pub fn list(&self) -> Vec<crate::model::Tool> {
         self.map.values().map(|item| item.attr.clone()).collect()
+    }
+}
+
+#[cfg(feature = "macros")]
+#[macro_export]
+macro_rules! tool_box {
+    (@pin_add $callee: ident, $attr: expr, $f: expr) => {
+        $callee.add(ToolBoxItem::new($attr, |context| Box::pin($f(context))));
+    };
+    ($server: ident { $($tool: ident),* $(,)?}) => {
+        fn tool_box() -> &'static $crate::handler::server::tool::ToolBox<$server> {
+            use $crate::handler::server::tool::{ToolBox, ToolBoxItem};
+            static TOOL_BOX: std::sync::OnceLock<ToolBox<$server>> = std::sync::OnceLock::new();
+            TOOL_BOX.get_or_init(|| {
+                let mut tool_box = ToolBox::new();
+                $crate::paste!{
+                    $(
+                        $crate::tool_box!(@pin_add tool_box, $server::[< $tool _tool_attr>](), $server::[<$tool _tool_call>]);
+                    )*
+                }
+                tool_box
+            })
+        }
+    };
+    (@derive) => {
+        async fn list_tools(
+            &self,
+            _: $crate::model::PaginatedRequestParam,
+            _: $crate::service::RequestContext<$crate::service::RoleServer>,
+        ) -> Result<$crate::model::ListToolsResult, $crate::Error> {
+            Ok($crate::model::ListToolsResult {
+                next_cursor: None,
+                tools: Self::tool_box().list(),
+            })
+        }
+
+        async fn call_tool(
+            &self,
+            call_tool_request_param: $crate::model::CallToolRequestParam,
+            context: $crate::service::RequestContext<$crate::service::RoleServer>,
+        ) -> Result<$crate::model::CallToolResult, $crate::Error> {
+            let context = $crate::handler::server::tool::ToolCallContext::new(self, call_tool_request_param, context);
+            Self::tool_box().call(context).await
+        }
     }
 }

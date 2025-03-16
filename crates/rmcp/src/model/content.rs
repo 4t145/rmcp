@@ -20,7 +20,6 @@ pub struct RawImageContent {
     pub mime_type: String,
 }
 
-
 pub type ImageContent = Annotated<RawImageContent>;
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]

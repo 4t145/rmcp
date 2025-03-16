@@ -19,7 +19,7 @@ tracing-subscriber = { version = "0.3", features = [
 futures = "0.3"
 rand = { version = "0.8" }
 axum = { version = "0.8", features = ["macros"] }
-
+schemars = { version = "0.8", optional = true }
 # [dev-dependencies.'cfg(target_arch="linux")'.dependencies]
 
 [dev-dependencies]

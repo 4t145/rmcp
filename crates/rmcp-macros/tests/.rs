@@ -1,29 +1,20 @@
-fn echo_tool_attr() -> rmcp::model::Tool {
+fn sum_tool_attr() -> rmcp::model::Tool {
     rmcp::model::Tool {
         name: "test_tool".into(),
         description: "test tool".into(),
-        input_schema: {
-            #[derive(serde :: Serialize, serde :: Deserialize, schemars :: JsonSchema)]
-            pub struct __ECHOToolCallParam {
-                pub echo: String,
-            }
-            rmcp::handler::server::tool::cached_schema_for_type::<__ECHOToolCallParam>()
-        }
-        .into(),
+        input_schema: rmcp::handler::server::tool::cached_schema_for_type::<req: StructRequest>()
+            .into(),
     }
 }
-fn echo_inner(&self, echo: String) -> Result<CallToolResult, McpError> {
-    Ok(CallToolResult::success(vec![Content::text(echo)]))
-}
-fn echo(
-    &self,
-    __rmcp_tool_req: rmcp::model::JsonObject,
+async fn sum_tool_call(
+    context: rmcp::handler::server::tool::ToolCallContext<'_, Self>,
 ) -> std::result::Result<rmcp::model::CallToolResult, rmcp::Error> {
     use rmcp::handler::server::tool::*;
-    #[derive(serde :: Serialize, serde :: Deserialize, schemars :: JsonSchema)]
-    pub struct __ECHOToolCallParam {
-        pub echo: String,
-    }
-    let __ECHOToolCallParam { echo } = parse_json_object(__rmcp_tool_req)?;
-    echo_inner(self, echo).into_call_tool_result()
+    let (__rmcp_tool_receiver, context) = <&Self>::from_tool_call_context_part(context)?;
+    let (Parameters(req), context) =
+        <Parameters<StructRequest>>::from_tool_call_context_part(context)?;
+    Self::sum(__rmcp_tool_receiver, req).into_call_tool_result()
+}
+fn sum(&self, req: StructRequest) -> Result<CallToolResult, McpError> {
+    Ok(CallToolResult::success(vec![Content::text(saying)]))
 }

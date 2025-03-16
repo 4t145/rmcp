@@ -1,21 +1,18 @@
-use std::{
-    borrow::Cow,
-    sync::{Arc, OnceLock},
-};
+use std::sync::Arc;
 
 use rmcp::{
-    Error as McpError, RoleServer, ServerHandler, const_string,
-    handler::server::{
-        tool_v1::{ToolSet, ToolTrait},
-        tool_v2::{Callee, Parameter, ToolCallContext},
-    },
-    model::*,
-    service::RequestContext,
-    tool,
+    Error as McpError, RoleServer, ServerHandler, const_string, model::*, schemars,
+    service::RequestContext, tool, tool_box,
 };
 
 use serde_json::json;
 use tokio::sync::Mutex;
+
+#[derive(Debug, serde::Deserialize, schemars::JsonSchema)]
+pub struct StructRequest {
+    pub a: i32,
+    pub b: i32,
+}
 
 #[derive(Clone)]
 pub struct Counter {
@@ -24,8 +21,6 @@ pub struct Counter {
 
 impl Counter {
     pub fn new() -> Self {
-        let counter = Arc::new(Mutex::new(0));
-
         Self {
             counter: Arc::new(Mutex::new(0)),
         }
@@ -68,25 +63,38 @@ impl Counter {
     }
 
     #[tool(description = "Repeat what you say")]
-    fn echo(&self, #[tool(param)] saying: String) -> Result<CallToolResult, McpError> {
+    fn echo(
+        &self,
+        #[tool(param)]
+        #[schemars(description = "Repeat what you say")]
+        saying: String,
+    ) -> Result<CallToolResult, McpError> {
         Ok(CallToolResult::success(vec![Content::text(saying)]))
     }
 
-    // pub fn tool_box() -> &'static ToolBox<Counter> {
-    //     static TOOL_BOX: OnceLock<ToolBox<Counter>> = OnceLock::new();
-    //     TOOL_BOX.get_or_init(|| {
-    //         let mut tool_box = ToolBox::new();
-    //         tool_box.add(Self::increment_tool_attr(), Self::increment);
-    //         // tool_box.add(Self::decrement_tool_attr(), Self::decrement);
-    //         // tool_box.add(Self::get_value_tool_attr(), Self::get_value);
-    //         // tool_box.add(Self::say_hello_tool_attr(), Self::say_hello);
-    //         // tool_box.add(Self::echo_tool_attr(), Self::echo_call);
-    //         tool_box
-    //     })
-    // }
+    #[tool(description = "Calculate the sum of two numbers")]
+    fn sum(
+        &self,
+        #[tool(aggr)] StructRequest { a, b }: StructRequest,
+    ) -> Result<CallToolResult, McpError> {
+        Ok(CallToolResult::success(vec![Content::text(
+            (a + b).to_string(),
+        )]))
+    }
+
+    rmcp::tool_box!(Counter {
+        increment,
+        decrement,
+        get_value,
+        say_hello,
+        echo,
+        sum
+    });
 }
 const_string!(Echo = "echo");
 impl ServerHandler for Counter {
+    tool_box!(@derive);
+
     fn get_info(&self) -> ServerInfo {
         ServerInfo {
             protocol_version: ProtocolVersion::V_2024_11_05,
@@ -101,83 +109,6 @@ impl ServerHandler for Counter {
             },
             server_info: Implementation::from_build_env(),
             instructions: Some("This server provides a counter tool that can increment and decrement values. The counter starts at 0 and can be modified using the 'increment' and 'decrement' tools. Use 'get_value' to check the current count.".to_string()),
-        }
-    }
-
-    async fn list_tools(
-        &self,
-        _request: PaginatedRequestParam,
-        _: RequestContext<RoleServer>,
-    ) -> Result<ListToolsResult, McpError> {
-        let tools = vec![
-            Self::increment_tool_attr(),
-            Self::decrement_tool_attr(),
-            Self::get_value_tool_attr(),
-            Self::say_hello_tool_attr(),
-            Self::echo_tool_attr(),
-        ];
-        Ok(ListToolsResult {
-            next_cursor: None,
-            tools
-        })
-    }
-
-    async fn call_tool(
-        &self,
-        call_tool_request_param: CallToolRequestParam,
-        context: RequestContext<RoleServer>,
-    ) -> Result<CallToolResult, McpError> {
-        static TOOL_STATIC_ROOTER: std::sync::OnceLock<
-            std::collections::HashMap<
-                String,
-                Box<
-                    dyn for<'a> Fn(
-                            ToolCallContext<'a, Counter>,
-                        ) -> std::pin::Pin<
-                            std::boxed::Box<
-                                dyn Future<Output = Result<CallToolResult, McpError>> + Send + 'a,
-                            >,
-                        > + Send
-                        + Sync,
-                >,
-            >,
-        > = std::sync::OnceLock::new();
-        let map = TOOL_STATIC_ROOTER.get_or_init(|| {
-            let mut map = <std::collections::HashMap<
-                String,
-                Box<
-                    dyn for<'a> Fn(
-                            ToolCallContext<'a, Counter>,
-                        ) -> std::pin::Pin<
-                            std::boxed::Box<
-                                dyn Future<
-                                        Output = Result<rmcp::model::CallToolResult, rmcp::Error>,
-                                    > + Send
-                                    + 'a,
-                            >,
-                        > + Send
-                        + Sync,
-                >,
-            >>::new();
-            map.insert(
-                "increment".to_string(),
-                Box::new(|context: ToolCallContext<'_, Counter>| {
-                    Box::pin(context.invoke(Self::increment))
-                }),
-            );
-            map.insert(
-                "decrement".to_string(),
-                Box::new(|context: ToolCallContext<'_, Counter>| {
-                    Box::pin(context.invoke(Self::decrement))
-                }),
-            );
-            map
-        });
-        let context = ToolCallContext::new(self, call_tool_request_param, context);
-        if let Some(caller) = map.get(context.name()) {
-            (caller)(context).await
-        } else {
-            Err(McpError::invalid_params("method not found", None))
         }
     }
 

@@ -61,6 +61,67 @@ let quit_reason = server.waiting().await?;
 let quit_reason = server.cancel().await?;
 ```
 
+### Use marcos to declaring tool
+Use `toolbox` and `tool` macros to create tool quickly.
+
+Check this [file](examples/servers/src/common/caculater.rs).
+```rust
+use rmcp::{ServerHandler, model::ServerInfo, schemars, tool, tool_box};
+
+use super::counter::Counter;
+
+#[derive(Debug, serde::Deserialize, schemars::JsonSchema)]
+pub struct SumRequest {
+    #[schemars(description = "the left hand side number")]
+    pub a: i32,
+    pub b: i32,
+}
+#[derive(Debug, Clone)]
+pub struct Calculater;
+impl Calculater {
+    // async function
+    #[tool(description = "Calculate the sum of two numbers")]
+    fn async sum(&self, #[tool(aggr)] SumRequest { a, b }: SumRequest) -> String {
+        (a + b).to_string()
+    }
+
+    // sync function
+    #[tool(description = "Calculate the sum of two numbers")]
+    fn sub(
+        &self,
+        #[tool(param)]
+        // this macro will transfer the schemars and serde's attributes
+        #[schemars(description = "the left hand side number")]
+        a: i32,
+        #[tool(param)]
+        #[schemars(description = "the left hand side number")]
+        b: i32,
+    ) -> String {
+        (a - b).to_string()
+    }
+
+    // create a static toolbox to store the tool attributes
+    tool_box!(Calculater { sum, sub });
+}
+
+impl ServerHandler for Calculater {
+    // impl call_tool and list_tool by quering static toolbox
+    tool_box!(@derive);
+    
+    fn get_info(&self) -> ServerInfo {
+        ServerInfo {
+            instructions: Some("A simple caculator".into()),
+            ..Default::default()
+        }
+    }
+}
+```
+The only thing you should do is to make the function's return type implement `IntoCallToolResult`.
+
+And you can just implement `IntoContents`, and the return value will be marked as success automatically. 
+
+If you return a type of `Result<T, E>` where `T` and `E` both implemented `IntoContents`, it's also OK.
+
 ### Examples
 See [examples](examples/README.md)
 

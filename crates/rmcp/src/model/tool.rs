@@ -24,7 +24,7 @@ impl Tool {
     where
         N: Into<Cow<'static, str>>,
         D: Into<Cow<'static, str>>,
-        S: Into<Arc<JsonObject>>
+        S: Into<Arc<JsonObject>>,
     {
         Tool {
             name: name.into(),

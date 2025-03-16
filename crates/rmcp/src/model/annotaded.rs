@@ -147,12 +147,11 @@ impl<T: AnnotateAble> Annotated<T> {
 
 mod sealed {
     pub trait Sealed {}
-
 }
 macro_rules! annotate {
     ($T: ident) => {
-        impl sealed::Sealed for $T { }
-        impl AnnotateAble for $T { }
+        impl sealed::Sealed for $T {}
+        impl AnnotateAble for $T {}
     };
 }
 

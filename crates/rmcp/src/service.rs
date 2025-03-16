@@ -233,7 +233,6 @@ pub struct RequestContext<R: ServiceRole> {
     pub peer: Peer<R>,
 }
 
-
 /// Use this function to skip initialization process
 pub async fn serve_directly<S, T, E>(
     service: S,

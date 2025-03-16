@@ -1,22 +1,26 @@
+use std::collections::HashSet;
+
 use proc_macro2::TokenStream;
 use quote::{ToTokens, quote};
 use syn::{
-    parse::Parse, parse2, parse_macro_input, parse_quote, punctuated::Punctuated, spanned::Spanned, token::Comma, Attribute, Expr, FnArg, Ident, Item, ItemFn, LitStr, MetaList, Pat, PatIdent, PatType, Token, Type
+    Expr, FnArg, Ident, ItemFn, MetaList, PatType, Token, Type, Visibility, parse::Parse,
+    parse_quote,
 };
 #[derive(Default)]
 struct ToolFnItemAttrs {
     name: Option<Expr>,
     description: Option<Expr>,
+    vis: Option<Visibility>,
 }
 
 impl Parse for ToolFnItemAttrs {
     fn parse(input: syn::parse::ParseStream) -> syn::Result<Self> {
         let mut name = None;
         let mut description = None;
+        let mut vis = None;
         while !input.is_empty() {
             let key: Ident = input.parse()?;
             input.parse::<Token![=]>()?;
-
             match key.to_string().as_str() {
                 "name" => {
                     let value: Expr = input.parse()?;
@@ -25,6 +29,10 @@ impl Parse for ToolFnItemAttrs {
                 "description" => {
                     let value: Expr = input.parse()?;
                     description = Some(value);
+                }
+                "vis" => {
+                    let value: Visibility = input.parse()?;
+                    vis = Some(value);
                 }
                 _ => {
                     return Err(syn::Error::new(key.span(), "unknown attribute"));
@@ -36,7 +44,11 @@ impl Parse for ToolFnItemAttrs {
             input.parse::<Token![,]>()?;
         }
 
-        Ok(ToolFnItemAttrs { name, description })
+        Ok(ToolFnItemAttrs {
+            name,
+            description,
+            vis,
+        })
     }
 }
 
@@ -69,7 +81,6 @@ enum ToolParams {
     },
     Params {
         attrs: Vec<ToolFnParamAttrs>,
-        trailing_args: Vec<FnArg>
     },
     #[default]
     NoParam,
@@ -104,12 +115,13 @@ impl Parse for ParamMarker {
 }
 
 pub(crate) fn tool(attr: TokenStream, input: TokenStream) -> syn::Result<TokenStream> {
-    let mut attrs = ToolAttrs::default();
+    let mut tool_macro_attrs = ToolAttrs::default();
     let args: ToolFnItemAttrs = syn::parse2(attr)?;
-    attrs.fn_item = args;
+    tool_macro_attrs.fn_item = args;
     let mut input_fn = syn::parse2::<ItemFn>(input)?;
-    let mut fommated_fn_args: Punctuated<FnArg, Comma> = Punctuated::new();
-    for mut fn_arg in input_fn.sig.inputs {
+    // let mut fommated_fn_args: Punctuated<FnArg, Comma> = Punctuated::new();
+    let mut unextractable_args_indexes = HashSet::new();
+    for (index, mut fn_arg) in input_fn.sig.inputs.iter_mut().enumerate() {
         enum Catched {
             Param(ToolFnParamAttrs),
             Aggregated(PatType),
@@ -117,7 +129,6 @@ pub(crate) fn tool(attr: TokenStream, input: TokenStream) -> syn::Result<TokenSt
         let mut catched = None;
         match &mut fn_arg {
             FnArg::Receiver(_) => {
-                fommated_fn_args.push(fn_arg);
                 continue;
             }
             FnArg::Typed(pat_type) => {
@@ -170,29 +181,28 @@ pub(crate) fn tool(attr: TokenStream, input: TokenStream) -> syn::Result<TokenSt
                     Some(Catched::Param(mut param)) => {
                         param.serde_meta = serde_metas;
                         param.schemars_meta = schemars_metas;
-                        match &mut attrs.params {
-                            ToolParams::Params { attrs, trailing_args } => {
+                        match &mut tool_macro_attrs.params {
+                            ToolParams::Params { attrs } => {
                                 attrs.push(param);
-                                trailing_args.push(fn_arg);
                             }
                             _ => {
-                                attrs.params = ToolParams::Params { attrs: vec![param], trailing_args: vec![fn_arg] };
+                                tool_macro_attrs.params = ToolParams::Params { attrs: vec![param] };
                             }
                         }
+                        unextractable_args_indexes.insert(index);
                     }
                     Some(Catched::Aggregated(rust_type)) => {
-                        attrs.params = ToolParams::Aggregated { rust_type };
+                        tool_macro_attrs.params = ToolParams::Aggregated { rust_type };
+                        unextractable_args_indexes.insert(index);
                     }
-                    None => {
-                        fommated_fn_args.push(fn_arg);
-                    }
+                    None => {}
                 }
             }
         }
     }
 
-    input_fn.sig.inputs = fommated_fn_args;
-    let name = if let Some(expr) = attrs.fn_item.name {
+    // input_fn.sig.inputs = fommated_fn_args;
+    let name = if let Some(expr) = tool_macro_attrs.fn_item.name {
         expr
     } else {
         let fn_name = &input_fn.sig.ident;
@@ -207,17 +217,18 @@ pub(crate) fn tool(attr: TokenStream, input: TokenStream) -> syn::Result<TokenSt
 
     // generate get tool attr function
     let tool_attr_fn = {
-        let description = if let Some(expr) = attrs.fn_item.description {
+        let description = if let Some(expr) = tool_macro_attrs.fn_item.description {
             expr
         } else {
             parse_quote! {
                 ""
             }
         };
-        let schema = match &attrs.params {
+        let schema = match &tool_macro_attrs.params {
             ToolParams::Aggregated { rust_type } => {
+                let ty = &rust_type.ty;
                 let schema = quote! {
-                    rmcp::handler::server::tool::cached_schema_for_type::<#rust_type>()
+                    rmcp::handler::server::tool::cached_schema_for_type::<#ty>()
                 };
                 schema
             }
@@ -253,107 +264,148 @@ pub(crate) fn tool(attr: TokenStream, input: TokenStream) -> syn::Result<TokenSt
     };
 
     // generate wrapped tool function
-    let wrapped_tool_function = {
-        match &mut attrs.params {
-            ToolParams::Aggregated { rust_type } => {
-                rust_type.ty = parse_quote! {
-                    rmcp::handler::tool::Parameters(#rust_type.ty)
-                };
-                let PatType {
-                    attrs,
-                    pat,
-                    colon_token,
-                    ty,
-                } = rust_type;
-                input_fn.sig.inputs.push(parse_quote! {
-                    #(#attrs)*
-                    rmcp::handler::tool::Parameters(#pat): rmcp::handler::tool::Parameters(#ty)
-                });
-                
-                input_fn.into_token_stream()
-            }
-            ToolParams::Params { attrs, trailing_args } => {
-                let wapper_fn_vis = input_fn.vis.clone();
-                let mut wapper_fn_sig = input_fn.sig.clone();
-                wapper_fn_sig.inputs.push(parse_quote! {
-                    __rmcp_tool_req: rmcp::model::JsonObject
-                });
-                wapper_fn_sig.output = parse_quote! {
-                    -> std::result::Result<rmcp::model::CallToolResult, rmcp::Error>
-                };
-                // rename the wrapper ident
-                let wapper_fn_ident = Ident::new(
-                    &format!("{}_call", wapper_fn_sig.ident),
-                    proc_macro2::Span::call_site(),
-                );
+    let tool_call_fn = {
+        // wrapper function have the same sig:
+        // async fn #tool_tool_call(context: rmcp::handler::server::tool::ToolCallContext<'_, Self>)
+        //      -> std::result::Result<rmcp::model::CallToolResult, rmcp::Error>
+        //
+        // and the block part shoule be like:
+        // {
+        //      use rmcp::handler::server::tool::*;
+        //      let (t0, context) = <T0>::from_tool_call_context_part(context)?;
+        //      let (t1, context) = <T1>::from_tool_call_context_part(context)?;
+        //      ...
+        //      let (tn, context) = <Tn>::from_tool_call_context_part(context)?;
+        //      // for params
+        //      ... expand helper types here
+        //      let (__rmcp_tool_req, context) = rmcp::model::JsonObject::from_tool_call_context_part(context)?;
+        //      let __#TOOL_ToolCallParam { param_0, param_1, param_2, .. } = parse_json_object(__rmcp_tool_req)?;
+        //      // for aggr
+        //      let (Parameters(aggr), context) = <Parameters<AggrType>>::from_tool_call_context_part(context)?;
+        //      Self::#tool_ident(to, param_0, t1, param_1, ..., param_2, tn, aggr).await.into_call_tool_result()
+        //
+        // }
+        //
+        //
+        //
 
-                wapper_fn_sig.ident = wapper_fn_ident;
-
-
-                let (param_type, temp_param_type_name) =
-                    create_request_type(attrs, input_fn.sig.ident.to_string());
-                
-                let params_ident = attrs.iter().map(|attr| &attr.ident).collect::<Vec<_>>();
-                // restore raw funcion args
-                input_fn.sig.inputs.extend(trailing_args.drain(..));
-                
-                // has receiver type?
-
-
-
-                let ItemFn {
-                    attrs: input_fn_attrs,
-                    vis: _,
-                    sig,
-                    block: _,
-                } = &input_fn;
-                let input_fn_ident = &sig.ident;
-                let input_fn_args_ident = sig
-                    .inputs
-                    .iter()
-                    .map(|attr| match attr {
-                        FnArg::Typed(pat_type) => pat_type.pat.to_token_stream(),
-                        FnArg::Receiver(receiver) => receiver.self_token.into_token_stream(),
-                    })
-                    .collect::<Vec<_>>();
-                if sig.asyncness.is_some() {
-                    quote! {
-                        #input_fn
-                        #(#input_fn_attrs)*
-                        #wapper_fn_vis #wapper_fn_sig {
-                            use rmcp::handler::server::tool::*;
-                            #param_type
-                            let #temp_param_type_name {
-                                #(#params_ident,)*
-                            } = parse_json_object(__rmcp_tool_req)?;
-                            Self::#input_fn_ident(
-                                #(#input_fn_args_ident,)*
-                            ).await.into_call_tool_result()
-                        }
-                    }
+        // for receiver type, name it as __rmcp_tool_receiver
+        let is_async = input_fn.sig.asyncness.is_some();
+        let receiver_ident = || Ident::new("__rmcp_tool_receiver", proc_macro2::Span::call_site());
+        // generate the extraction part for trival args
+        let trival_args = input_fn
+            .sig
+            .inputs
+            .iter()
+            .enumerate()
+            .filter_map(|(index, arg)| {
+                if unextractable_args_indexes.contains(&index) {
+                    None
                 } else {
-                    quote! {
-                        #input_fn
-                        #(#input_fn_attrs)*
-                        #wapper_fn_vis #wapper_fn_sig {
-                            use rmcp::handler::server::tool::*;
-                            #param_type
-                            let #temp_param_type_name {
-                                #(#params_ident,)*
-                            } = parse_json_object(__rmcp_tool_req)?;
-                            Self::#input_fn_ident(
-                                #(#input_fn_args_ident,)*
-                            ).into_call_tool_result()
+                    // get ident/type pair
+                    let line = match arg {
+                        FnArg::Typed(pat_type) => {
+                            let pat = &pat_type.pat;
+                            let ty = &pat_type.ty;
+                            quote! {
+                                let (#pat, context) = <#ty>::from_tool_call_context_part(context)?;
+                            }
                         }
-                    }
+                        FnArg::Receiver(r) => {
+                            let ty = r.ty.clone();
+                            let pat = receiver_ident();
+                            quote! {
+                                let  (#pat, context) = <#ty>::from_tool_call_context_part(context)?;
+                            }
+                        }
+                    };
+                    Some(line)
+                }
+            });
+        let trival_argrextraction_part = quote! {
+            #(#trival_args)*
+        };
+        let processed_argrextraction_part = match &mut tool_macro_attrs.params {
+            ToolParams::Aggregated { rust_type } => {
+                let PatType { pat, ty, .. } = rust_type;
+                quote! {
+                    let (Parameters(#pat), context) = <Parameters<#ty>>::from_tool_call_context_part(context)?;
                 }
             }
-            ToolParams::NoParam => input_fn.into_token_stream(),
+            ToolParams::Params { attrs } => {
+                let (param_type, temp_param_type_name) =
+                    create_request_type(attrs, input_fn.sig.ident.to_string());
+
+                let params_ident = attrs.iter().map(|attr| &attr.ident).collect::<Vec<_>>();
+                quote! {
+                    #param_type
+                    let (__rmcp_tool_req, context) = rmcp::model::JsonObject::from_tool_call_context_part(context)?;
+                    let #temp_param_type_name {
+                        #(#params_ident,)*
+                    } = parse_json_object(__rmcp_tool_req)?;
+                }
+            }
+            ToolParams::NoParam => {
+                quote! {}
+            }
+        };
+        // generate the execution part
+        // has reveiver?
+        let params = &input_fn
+            .sig
+            .inputs
+            .iter()
+            .map(|fn_arg| match fn_arg {
+                FnArg::Receiver(_) => {
+                    let pat = receiver_ident();
+                    quote! { #pat }
+                }
+                FnArg::Typed(pat_type) => {
+                    let pat = &pat_type.pat.clone();
+                    quote! { #pat }
+                }
+            })
+            .collect::<Vec<_>>();
+        let raw_fn_ident = &input_fn.sig.ident;
+        let call = if is_async {
+            quote! {
+                Self::#raw_fn_ident(#(#params),*).await.into_call_tool_result()
+            }
+        } else {
+            quote! {
+                Self::#raw_fn_ident(#(#params),*).into_call_tool_result()
+            }
+        };
+        // assemble the whole function
+        let tool_call_fn_ident = Ident::new(
+            &format!("{}_tool_call", input_fn.sig.ident),
+            proc_macro2::Span::call_site(),
+        );
+        let raw_fn_vis = tool_macro_attrs
+            .fn_item
+            .vis
+            .as_ref()
+            .unwrap_or(&input_fn.vis);
+        let raw_fn_attr = &input_fn
+            .attrs
+            .iter()
+            .filter(|attr| !attr.path().is_ident(TOOL_IDENT))
+            .collect::<Vec<_>>();
+        quote! {
+            #(#raw_fn_attr)*
+            #raw_fn_vis async fn #tool_call_fn_ident(context: rmcp::handler::server::tool::ToolCallContext<'_, Self>)
+                -> std::result::Result<rmcp::model::CallToolResult, rmcp::Error> {
+                use rmcp::handler::server::tool::*;
+                #trival_argrextraction_part
+                #processed_argrextraction_part
+                #call
+            }
         }
     };
     Ok(quote! {
         #tool_attr_fn
-        #wrapped_tool_function
+        #tool_call_fn
+        #input_fn
     })
 }
 
@@ -382,17 +434,12 @@ mod test {
     fn test_tool_sync_macro() -> syn::Result<()> {
         let attr = quote! {
             name = "test_tool",
-            description = "test tool"
+            description = "test tool",
+            vis =
         };
         let input = quote! {
-            fn echo(
-                &self,  
-                #[tool(param)]
-                echo: String
-            ) -> Result<CallToolResult, McpError> {
-                Ok(CallToolResult::success(vec![Content::text(
-                    echo
-                )]))
+            fn sum(&self, #[tool(aggr)] req: StructRequest) -> Result<CallToolResult, McpError> {
+                Ok(CallToolResult::success(vec![Content::text((req.a + req.b).to_string())]))
             }
         };
         let input = tool(attr, input)?;

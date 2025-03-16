@@ -22,7 +22,9 @@ pub mod transport;
 pub use rmcp_macros::tool;
 
 // re-export
-#[cfg(feature = "macros")]
-pub use serde;
+#[cfg(all(feature = "macros", feature = "server"))]
+pub use paste::paste;
 #[cfg(all(feature = "macros", feature = "server"))]
 pub use schemars;
+#[cfg(feature = "macros")]
+pub use serde;

@@ -12,8 +12,6 @@ use tokio_util::{
 };
 
 use super::Transport;
-#[cfg(target_os="wasi")]
-pub mod wasip1;
 
 pub fn async_rw<I, O, R, W>(
     read: R,
