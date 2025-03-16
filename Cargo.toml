@@ -19,3 +19,4 @@ categories = [
     "network-programming",
     "asynchronous",
 ]
+readme = "README.md"
