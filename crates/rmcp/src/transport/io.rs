@@ -12,7 +12,35 @@ use tokio_util::{
 };
 
 use super::Transport;
-
+/// This function is used to create a transport using async read and write
+///
+/// # Examples
+///
+/// ```rust
+/// # use rmcp::{
+/// #     ClientHandlerService, ServerHandlerService, serve_client, serve_server, transport::io::async_rw,
+/// # };
+///
+/// // create transport from tcp stream
+/// async fn client() -> Result<(), Box<dyn std::error::Error>> {
+///     let stream = tokio::net::TcpSocket::new_v4()?
+///         .connect("127.0.0.1:8001".parse()?)
+///         .await?;
+///     let (rx, tx) = stream.into_split();
+///     let client = serve_client(ClientHandlerService::new(None), async_rw(rx, tx)).await?;
+///     let tools = client.peer().list_tools(Default::default()).await?;
+///     println!("{:?}", tools);
+///     Ok(())
+/// }
+///
+/// // create transport from std io
+/// async fn io()  -> Result<(), Box<dyn std::error::Error>> {
+///     let client = serve_client(ClientHandlerService::new(None), async_rw(tokio::io::stdin(), tokio::io::stdout())).await?;
+///     let tools = client.peer().list_tools(Default::default()).await?;
+///     println!("{:?}", tools);
+///     Ok(())
+/// }
+/// ```
 pub fn async_rw<I, O, R, W>(
     read: R,
     write: W,
