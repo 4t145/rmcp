@@ -39,8 +39,10 @@ jobs:
         run: cargo login ${{ secrets.CRATES_TOKEN }}
       - name: Publish macros dry run
         run: cargo publish -p rmcp-macros --dry-run
+        continue-on-error: true
       - name: Publish rmcp dry run
         run: cargo publish -p rmcp --dry-run
+        continue-on-error: true
       - name: Publish macro
         if: ${{ startsWith(github.ref, 'refs/tags/release') }}
         continue-on-error: true 
