@@ -3,10 +3,10 @@ name: Release
 on:
   push:
     branches: [ release ]
+    tags:
+      - 'release-*'
   pull_request:
     branches: [ release ]
-  tags:
-    - 'release-*'
 env:
   CARGO_TERM_COLOR: always
   ARTIFACT_DIR: release-artifacts
