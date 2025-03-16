@@ -1,3 +1,15 @@
+//! The transport type must implemented Stream and Sink trait
+//!
+//! For client, the sink item is [`ClientJsonRpcMessage`](crate::model::ClientJsonRpcMessage) and stream item is [`ServerJsonRpcMessage`](crate::model::ServerJsonRpcMessage)
+//!
+//! For server, the sink item is [`ServerJsonRpcMessage`](crate::model::ServerJsonRpcMessage) and stream item is [`ClientJsonRpcMessage`](crate::model::ClientJsonRpcMessage)
+//!
+//! There are also some helper items to create a transport.
+//!
+//! You can use [`async_rw`](crate::transport::io::async_rw) to create transport from async read and write
+//!
+//! And to combine the item stream and sink, you can use [`Transport`](crate::transport::Transport) struct
+
 use futures::{Sink, Stream};
 #[cfg(feature = "transport-child-process")]
 pub mod child_process;
