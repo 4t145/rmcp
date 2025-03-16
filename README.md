@@ -1,7 +1,7 @@
 # RMCP
 [![Crates.io Version](https://img.shields.io/crates/v/rmcp)](https://crates.io/crates/rmcp)
 ![Release status](https://github.com/4t145/rmcp/actions/workflows/release.yml/badge.svg)
-[![docs.rs](https://img.shields.io/docsrs/rmcp)](https://docs.rs/rmcp/rmcp)
+[![docs.rs](https://img.shields.io/docsrs/rmcp)](https://docs.rs/rmcp/latest/rmcp)
 
 A better and clean rust Model Context Protocol SDK implementation with tokio async runtime.
 
