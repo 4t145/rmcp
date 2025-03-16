@@ -1,9 +1,9 @@
 use std::sync::{Arc, OnceLock};
 
 use rmcp::{
+    ClientHandler,
     model::{ClientInfo, ServerInfo},
     service::ServerSink,
-    ClientHandler,
 };
 
 #[derive(Debug, Clone, Default)]

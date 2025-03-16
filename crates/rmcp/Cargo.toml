@@ -4,9 +4,10 @@ license.workspace = true
 version.workspace = true
 edition.workspace = true
 repository.workspace = true
+homepage.workspace = true
+readme.workspace = true
 description = "Rust SDK for Model Context Protocol"
-
-
+documentation = "https://docs.rs/rmcp/rmcp"
 [dependencies]
 serde = { version = "1.0", features = ["derive", "rc"] }
 serde_json = "1.0"
