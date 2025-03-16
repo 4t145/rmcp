@@ -1,4 +1,4 @@
-use std::borrow::Cow;
+use std::{borrow::Cow, sync::Arc};
 
 /// Tools represent a routine that a server can execute
 /// Tool calls represent requests from the client to execute one
@@ -15,20 +15,21 @@ pub struct Tool {
     /// A description of what the tool does
     pub description: Cow<'static, str>,
     /// A JSON Schema object defining the expected parameters for the tool
-    pub input_schema: JsonObject,
+    pub input_schema: Arc<JsonObject>,
 }
 
 impl Tool {
     /// Create a new tool with the given name and description
-    pub fn new<N, D>(name: N, description: D, input_schema: JsonObject) -> Self
+    pub fn new<N, D, S>(name: N, description: D, input_schema: S) -> Self
     where
         N: Into<Cow<'static, str>>,
         D: Into<Cow<'static, str>>,
+        S: Into<Arc<JsonObject>>,
     {
         Tool {
             name: name.into(),
             description: description.into(),
-            input_schema,
+            input_schema: input_schema.into(),
         }
     }
 }

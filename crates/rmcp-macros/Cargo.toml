@@ -1,0 +1,20 @@
+[package]
+name = "rmcp-macros"
+edition.workspace = true
+version.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+description.workspace = true
+
+[lib]
+proc-macro = true
+
+[dependencies]
+syn = {version = "2", features = ["full"]}
+quote = "1"
+proc-macro2 = "1"
+
+
+[features]
+[dev-dependencies]

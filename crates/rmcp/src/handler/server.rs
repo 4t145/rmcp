@@ -2,8 +2,8 @@ use crate::error::Error as McpError;
 use crate::model::*;
 use crate::service::{Peer, RequestContext, RoleServer, Service, ServiceRole};
 
+// mod tool_v1;
 pub mod tool;
-
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
 pub struct ServerHandlerService<H> {
     pub handler: H,

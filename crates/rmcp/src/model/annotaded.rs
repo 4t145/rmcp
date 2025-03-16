@@ -1,6 +1,6 @@
 use std::ops::{Deref, DerefMut};
 
-use super::Role;
+use super::{RawContent, RawEmbeddedResource, RawImageContent, RawResource, RawTextContent, Role};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 
@@ -32,27 +32,27 @@ impl Annotations {
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct Annotated<T: Annotatable> {
+pub struct Annotated<T: AnnotateAble> {
     #[serde(flatten)]
     pub raw: T,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub annotations: Option<Annotations>,
 }
 
-impl<T: Annotatable> Deref for Annotated<T> {
+impl<T: AnnotateAble> Deref for Annotated<T> {
     type Target = T;
     fn deref(&self) -> &Self::Target {
         &self.raw
     }
 }
 
-impl<T: Annotatable> DerefMut for Annotated<T> {
+impl<T: AnnotateAble> DerefMut for Annotated<T> {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.raw
     }
 }
 
-impl<T: Annotatable> Annotated<T> {
+impl<T: AnnotateAble> Annotated<T> {
     pub fn new(raw: T, annotations: Option<Annotations>) -> Self {
         Self { raw, annotations }
     }
@@ -145,7 +145,23 @@ impl<T: Annotatable> Annotated<T> {
     }
 }
 
-pub trait Annotatable {
+mod sealed {
+    pub trait Sealed {}
+}
+macro_rules! annotate {
+    ($T: ident) => {
+        impl sealed::Sealed for $T {}
+        impl AnnotateAble for $T {}
+    };
+}
+
+annotate!(RawContent);
+annotate!(RawTextContent);
+annotate!(RawImageContent);
+annotate!(RawEmbeddedResource);
+annotate!(RawResource);
+
+pub trait AnnotateAble: sealed::Sealed {
     fn optional_annotate(self, annotations: Option<Annotations>) -> Annotated<Self>
     where
         Self: Sized,

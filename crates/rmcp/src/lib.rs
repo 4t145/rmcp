@@ -17,3 +17,14 @@ pub use handler::server::{ServerHandler, ServerHandlerService};
 
 pub mod handler;
 pub mod transport;
+
+#[cfg(all(feature = "macros", feature = "server"))]
+pub use rmcp_macros::tool;
+
+// re-export
+#[cfg(all(feature = "macros", feature = "server"))]
+pub use paste::paste;
+#[cfg(all(feature = "macros", feature = "server"))]
+pub use schemars;
+#[cfg(feature = "macros")]
+pub use serde;

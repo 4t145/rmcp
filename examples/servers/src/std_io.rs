@@ -1,6 +1,6 @@
 use anyhow::Result;
 use rmcp::{ServerHandlerService, serve_server, transport::io::async_rw};
-use tokio::io::{stdin, stdout};
+
 use tracing_subscriber::{self, EnvFilter};
 mod common;
 /// npx @modelcontextprotocol/inspector cargo run -p mcp-server-examples --example tokio_std_io
@@ -17,11 +17,11 @@ async fn main() -> Result<()> {
 
     // Create an instance of our counter router
     let service = ServerHandlerService::new(common::counter::Counter::new());
-    let transport = async_rw(stdin(), stdout());
+    let transport = async_rw(tokio::io::stdin(), tokio::io::stdout());
     let service = serve_server(service, transport).await.inspect_err(|e| {
         tracing::error!("serving error: {:?}", e);
     })?;
-    
+
     service.waiting().await?;
     Ok(())
 }
