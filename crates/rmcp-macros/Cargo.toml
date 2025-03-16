@@ -1,11 +1,12 @@
 [package]
 name = "rmcp-macros"
-edition.workspace = true
-version.workspace = true
-authors.workspace = true
 license.workspace = true
+version.workspace = true
+edition.workspace = true
 repository.workspace = true
-description.workspace = true
+homepage.workspace = true
+description = "Rust SDK for Model Context Protocol macros library"
+documentation = "https://docs.rs/rmcp/rmcp-macros"
 
 [lib]
 proc-macro = true
