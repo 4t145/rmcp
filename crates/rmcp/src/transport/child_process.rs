@@ -1,12 +1,16 @@
-use crate::model::{ClientJsonRpcMessage, ServerJsonRpcMessage};
 use futures::{Sink, Stream};
+use tokio::{
+    io::AsyncRead,
+    process::{ChildStdin, ChildStdout},
+};
 
-pub fn child_process(
+use crate::service::{RxJsonRpcMessage, ServiceRole, TxJsonRpcMessage};
+
+use super::IntoTransport;
+
+pub(crate) fn child_process(
     mut child: tokio::process::Child,
-) -> std::io::Result<(
-    tokio::process::Child,
-    impl Sink<ClientJsonRpcMessage, Error = std::io::Error> + Stream<Item = ServerJsonRpcMessage>,
-)> {
+) -> std::io::Result<(tokio::process::Child, (ChildStdout, ChildStdin))> {
     if child.stdin.is_none() {
         return Err(std::io::Error::other("std in was taken"));
     }
@@ -15,8 +19,73 @@ pub fn child_process(
     }
     let child_stdin = child.stdin.take().expect("already checked");
     let child_stdout = child.stdout.take().expect("already checked");
-    Ok((
-        child,
-        crate::transport::io::async_rw(child_stdout, child_stdin),
-    ))
+    Ok((child, (child_stdout, child_stdin)))
+}
+
+pub struct TokioChildProcess {
+    child: tokio::process::Child,
+    child_stdin: ChildStdin,
+    child_stdout: ChildStdout,
+}
+
+// we hold the child process with stdout, for it's easier to read implement
+pin_project_lite::pin_project! {
+    pub struct TokioChildProcessOut {
+        child: tokio::process::Child,
+        #[pin]
+        child_stdout: ChildStdout,
+    }
+}
+
+impl AsyncRead for TokioChildProcessOut {
+    fn poll_read(
+        self: std::pin::Pin<&mut Self>,
+        cx: &mut std::task::Context<'_>,
+        buf: &mut tokio::io::ReadBuf<'_>,
+    ) -> std::task::Poll<std::io::Result<()>> {
+        self.project().child_stdout.poll_read(cx, buf)
+    }
+}
+
+impl TokioChildProcess {
+    pub fn new(child: &mut tokio::process::Command) -> std::io::Result<Self> {
+        child
+            .kill_on_drop(true)
+            .stdin(std::process::Stdio::piped())
+            .stdout(std::process::Stdio::piped());
+        let (child, (child_stdout, child_stdin)) = child_process(child.spawn()?)?;
+        Ok(Self {
+            child,
+            child_stdin,
+            child_stdout,
+        })
+    }
+
+    pub fn split(self) -> (TokioChildProcessOut, ChildStdin) {
+        let TokioChildProcess {
+            child,
+            child_stdin,
+            child_stdout,
+        } = self;
+        (
+            TokioChildProcessOut {
+                child,
+                child_stdout,
+            },
+            child_stdin,
+        )
+    }
+}
+
+impl<R: ServiceRole> IntoTransport<R, std::io::Error, ()> for TokioChildProcess {
+    fn into_transport(
+        self,
+    ) -> (
+        impl Sink<TxJsonRpcMessage<R>, Error = std::io::Error> + Send + 'static,
+        impl Stream<Item = RxJsonRpcMessage<R>> + Send + 'static,
+    ) {
+        IntoTransport::<R, std::io::Error, super::io::TranportAdapterAsyncRW>::into_transport(
+            self.split(),
+        )
+    }
 }

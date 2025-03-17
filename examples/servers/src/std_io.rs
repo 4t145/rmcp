@@ -1,5 +1,6 @@
 use anyhow::Result;
-use rmcp::{ServerHandlerService, serve_server, transport::io::async_rw};
+use common::counter::Counter;
+use rmcp::{ServerHandlerService, serve_server};
 
 use tracing_subscriber::{self, EnvFilter};
 mod common;
@@ -16,9 +17,12 @@ async fn main() -> Result<()> {
     tracing::info!("Starting MCP server");
 
     // Create an instance of our counter router
-    let service = ServerHandlerService::new(common::counter::Counter::new());
-    let transport = async_rw(tokio::io::stdin(), tokio::io::stdout());
-    let service = serve_server(service, transport).await.inspect_err(|e| {
+    let service = serve_server(
+        ServerHandlerService::new(Counter::new()),
+        (tokio::io::stdin(), tokio::io::stdout()),
+    )
+    .await
+    .inspect_err(|e| {
         tracing::error!("serving error: {:?}", e);
     })?;
 

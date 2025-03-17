@@ -6,7 +6,7 @@ use axum::{
     routing::get,
 };
 use futures::{SinkExt, StreamExt, stream::Stream};
-use rmcp::{ServerHandlerService, model::ClientJsonRpcMessage, serve_server, transport::Transport};
+use rmcp::{ServerHandlerService, model::ClientJsonRpcMessage, serve_server};
 use std::collections::HashMap;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
@@ -88,7 +88,7 @@ async fn sse_handler(State(app): State<App>) -> Sse<impl Stream<Item = Result<Ev
             let service = ServerHandlerService::new(common::counter::Counter::new());
             let stream = ReceiverStream::new(from_client_rx);
             let sink = PollSender::new(to_client_tx).sink_map_err(std::io::Error::other);
-            let result = serve_server(service, Transport::new(sink, stream))
+            let result = serve_server(service, (sink, stream))
                 .await
                 .inspect_err(|e| {
                     tracing::error!("serving error: {:?}", e);
