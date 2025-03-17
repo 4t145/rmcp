@@ -1,16 +1,46 @@
-//! The transport type must implemented Stream and Sink trait
+//! # Transport
+//! The transport type must implemented [`IntoTransport`] trait, which allow split into a sink and a stream.
 //!
 //! For client, the sink item is [`ClientJsonRpcMessage`](crate::model::ClientJsonRpcMessage) and stream item is [`ServerJsonRpcMessage`](crate::model::ServerJsonRpcMessage)
 //!
 //! For server, the sink item is [`ServerJsonRpcMessage`](crate::model::ServerJsonRpcMessage) and stream item is [`ClientJsonRpcMessage`](crate::model::ClientJsonRpcMessage)
 //!
-//! There are also some helper items to create a transport.
+//! ## These types is automatically implemented [`IntoTransport`] trait
+//! 1. For type that already implement both [`Sink`] and [`Stream`] trait, they are automatically implemented [`IntoTransport`] trait
+//! 2. For tuple of sink `Tx` and stream `Rx`, type `(Tx, Rx)` are automatically implemented [`IntoTransport`] trait
+//! 3. For type that implement both [`tokio::io::AsyncRead`] and [`tokio::io::AsyncWrite`] trait, they are automatically implemented [`IntoTransport`] trait
+//! 4. For tulpe of [`tokio::io::AsyncRead`] `R `and [`tokio::io::AsyncWrite`] `W`, type `(R, W)` are automatically implemented [`IntoTransport`] trait
 //!
-//! You can use [`async_rw`](crate::transport::io::async_rw) to create transport from async read and write
+//! ## Examples
 //!
-//! And to combine the item stream and sink, you can use [`Transport`](crate::transport::Transport) struct
+//! ```rust
+//! # use rmcp::{
+//! #     ClientHandlerService, ServerHandlerService, serve_client, serve_server,
+//! # };
+//!
+//! // create transport from tcp stream
+//! async fn client() -> Result<(), Box<dyn std::error::Error>> {
+//!     let stream = tokio::net::TcpSocket::new_v4()?
+//!         .connect("127.0.0.1:8001".parse()?)
+//!         .await?;
+//!     let client = serve_client(ClientHandlerService::new(None), stream).await?;
+//!     let tools = client.peer().list_tools(Default::default()).await?;
+//!     println!("{:?}", tools);
+//!     Ok(())
+//! }
+//!
+//! // create transport from std io
+//! async fn io()  -> Result<(), Box<dyn std::error::Error>> {
+//!     let client = serve_client(ClientHandlerService::new(None), (tokio::io::stdin(), tokio::io::stdout())).await?;
+//!     let tools = client.peer().list_tools(Default::default()).await?;
+//!     println!("{:?}", tools);
+//!     Ok(())
+//! }
+//! ```
 
 use futures::{Sink, Stream};
+
+use crate::service::{RxJsonRpcMessage, ServiceRole, TxJsonRpcMessage};
 #[cfg(feature = "transport-child-process")]
 pub mod child_process;
 
@@ -20,67 +50,51 @@ pub mod io;
 #[cfg(feature = "transport-sse")]
 pub mod sse;
 
-pin_project_lite::pin_project! {
-    pub struct Transport<Tx, Rx> {
-        #[pin]
-        rx: Rx,
-        #[pin]
-        tx: Tx,
-    }
-}
-
-impl<Tx, Rx> Transport<Tx, Rx> {
-    pub fn new(tx: Tx, rx: Rx) -> Self {
-        Self { tx, rx }
-    }
-}
-impl<Tx, Rx> Stream for Transport<Tx, Rx>
+pub trait IntoTransport<R, E, A>: Send + 'static
 where
-    Rx: Stream,
+    R: ServiceRole,
+    E: std::error::Error + Send + 'static,
 {
-    type Item = Rx::Item;
+    fn into_transport(
+        self,
+    ) -> (
+        impl Sink<TxJsonRpcMessage<R>, Error = E> + Send + 'static,
+        impl Stream<Item = RxJsonRpcMessage<R>> + Send + 'static,
+    );
+}
 
-    fn poll_next(
-        self: std::pin::Pin<&mut Self>,
-        cx: &mut std::task::Context<'_>,
-    ) -> std::task::Poll<Option<Self::Item>> {
-        let this = self.project();
-        this.rx.poll_next(cx)
+pub enum TranportAdapterStreamSink {}
+
+impl<Role, Rx, Tx, E> IntoTransport<Role, E, TranportAdapterStreamSink> for (Tx, Rx)
+where
+    Role: ServiceRole,
+    Tx: Sink<TxJsonRpcMessage<Role>, Error = E> + Send + 'static,
+    Rx: Stream<Item = RxJsonRpcMessage<Role>> + Send + 'static,
+    E: std::error::Error + Send + 'static,
+{
+    fn into_transport(
+        self,
+    ) -> (
+        impl Sink<TxJsonRpcMessage<Role>, Error = E> + Send + 'static,
+        impl Stream<Item = RxJsonRpcMessage<Role>> + Send + 'static,
+    ) {
+        self
     }
 }
 
-impl<Tx, Rx, T> Sink<T> for Transport<Tx, Rx>
+impl<R, T, E> IntoTransport<R, E, ()> for T
 where
-    Tx: Sink<T>,
+    T: Stream<Item = RxJsonRpcMessage<R>> + Sink<TxJsonRpcMessage<R>, Error = E> + Send + 'static,
+    R: ServiceRole,
+    E: std::error::Error + Send + 'static,
 {
-    type Error = Tx::Error;
-
-    fn poll_ready(
-        self: std::pin::Pin<&mut Self>,
-        cx: &mut std::task::Context<'_>,
-    ) -> std::task::Poll<Result<(), Self::Error>> {
-        let this = self.project();
-        this.tx.poll_ready(cx)
-    }
-
-    fn start_send(self: std::pin::Pin<&mut Self>, item: T) -> Result<(), Self::Error> {
-        let this = self.project();
-        this.tx.start_send(item)
-    }
-
-    fn poll_flush(
-        self: std::pin::Pin<&mut Self>,
-        cx: &mut std::task::Context<'_>,
-    ) -> std::task::Poll<Result<(), Self::Error>> {
-        let this = self.project();
-        this.tx.poll_flush(cx)
-    }
-
-    fn poll_close(
-        self: std::pin::Pin<&mut Self>,
-        cx: &mut std::task::Context<'_>,
-    ) -> std::task::Poll<Result<(), Self::Error>> {
-        let this = self.project();
-        this.tx.poll_close(cx)
+    fn into_transport(
+        self,
+    ) -> (
+        impl Sink<TxJsonRpcMessage<R>, Error = E> + Send + 'static,
+        impl Stream<Item = RxJsonRpcMessage<R>> + Send + 'static,
+    ) {
+        use futures::StreamExt;
+        self.split()
     }
 }

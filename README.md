@@ -21,15 +21,23 @@ rmcp = { git = "https://github.com/4t145/rust-mcp-sdk", features = ["server"] }
 ### Quick start
 
 #### 1. Build a transport
-- A transport type for client should be a `Sink` of `ClientJsonRpcMessage` and a `Stream` of `ServerJsonRpcMessage`
-- A transport type for server should be a `Sink` of `ServerJsonRpcMessage` and a `Stream` of `ClientJsonRpcMessage`
+The transport type must implemented [`IntoTransport`] trait, which allow split into a sink and a stream.
 
-We already have some transport type or builder function in [`rmcp::transport`](crates/rmcp/src/transport.rs).
+For client, the sink item is [`ClientJsonRpcMessage`](crate::model::ClientJsonRpcMessage) and stream item is [`ServerJsonRpcMessage`](crate::model::ServerJsonRpcMessage)
+
+For server, the sink item is [`ServerJsonRpcMessage`](crate::model::ServerJsonRpcMessage) and stream item is [`ClientJsonRpcMessage`](crate::model::ClientJsonRpcMessage)
+
+##### These types is automatically implemented [`IntoTransport`] trait
+1. For type that already implement both [`Sink`] and [`Stream`] trait, they are automatically implemented [`IntoTransport`] trait
+2. For tuple of sink `Tx` and stream `Rx`, type `(Tx, Rx)` are automatically implemented [`IntoTransport`] trait
+3. For type that implement both [`tokio::io::AsyncRead`] and [`tokio::io::AsyncWrite`] trait, they are automatically implemented [`IntoTransport`] trait
+4. For tulpe of [`tokio::io::AsyncRead`] `R `and [`tokio::io::AsyncWrite`] `W`, type `(R, W)` are automatically implemented [`IntoTransport`] trait
+
 
 ```rust
 use rmcp::transport::io::async_rw;
 use tokio::io::{stdin, stdout};
-let transport = async_rw(stdin(), stdout());
+let transport = (stdin(), stdout());
 ```
 
 #### 2. Build a service

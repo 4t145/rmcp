@@ -1,13 +1,12 @@
 use anyhow::Result;
 use rmcp::{
     ClientHandlerService, model::CallToolRequestParam, serve_client,
-    transport::child_process::child_process,
+    transport::child_process::TokioChildProcess,
 };
 
+use tokio::process::Command;
 use tracing_subscriber::layer::SubscriberExt;
 use tracing_subscriber::util::SubscriberInitExt;
-mod common;
-use common::simple_client::SimpleClient;
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -19,23 +18,11 @@ async fn main() -> Result<()> {
         )
         .with(tracing_subscriber::fmt::layer())
         .init();
-    let (mut process, transport) = child_process(
-        tokio::process::Command::new("uvx")
-            .arg("mcp-server-git")
-            .kill_on_drop(true)
-            .stdin(std::process::Stdio::piped())
-            .stdout(std::process::Stdio::piped())
-            .spawn()?,
-    )?;
-
     let service = serve_client(
-        ClientHandlerService::new(SimpleClient::default()),
-        transport,
+        ClientHandlerService::new(None),
+        TokioChildProcess::new(Command::new("uvx").arg("mcp-server-git"))?,
     )
-    .await
-    .inspect_err(|e| {
-        tracing::error!("client error: {:?}", e);
-    })?;
+    .await?;
 
     // Initialize
     let server_info = service.peer().info();
@@ -55,6 +42,5 @@ async fn main() -> Result<()> {
         .await?;
     tracing::info!("Tool result: {tool_result:#?}");
     service.cancel().await?;
-    process.kill().await?;
     Ok(())
 }

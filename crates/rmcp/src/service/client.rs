@@ -1,19 +1,19 @@
 use crate::model::{
     CallToolRequest, CallToolRequestParam, CallToolResult, CancelledNotification,
-    CancelledNotificationParam, ClientInfo, ClientJsonRpcMessage, ClientMessage,
-    ClientNotification, ClientRequest, ClientResult, CompleteRequest, CompleteRequestParam,
-    CompleteResult, GetPromptRequest, GetPromptRequestParam, GetPromptResult, InitializeRequest,
-    InitializedNotification, ListPromptsRequest, ListPromptsResult, ListResourceTemplatesRequest,
+    CancelledNotificationParam, ClientInfo, ClientMessage, ClientNotification, ClientRequest,
+    ClientResult, CompleteRequest, CompleteRequestParam, CompleteResult, GetPromptRequest,
+    GetPromptRequestParam, GetPromptResult, InitializeRequest, InitializedNotification,
+    ListPromptsRequest, ListPromptsResult, ListResourceTemplatesRequest,
     ListResourceTemplatesResult, ListResourcesRequest, ListResourcesResult, ListToolsRequest,
     ListToolsResult, PaginatedRequestParam, ProgressNotification, ProgressNotificationParam,
     ReadResourceRequest, ReadResourceRequestParam, ReadResourceResult,
-    RootsListChangedNotification, ServerInfo, ServerJsonRpcMessage, ServerNotification,
-    ServerRequest, ServerResult, SetLevelRequest, SetLevelRequestParam, SubscribeRequest,
-    SubscribeRequestParam, UnsubscribeRequest, UnsubscribeRequestParam,
+    RootsListChangedNotification, ServerInfo, ServerNotification, ServerRequest, ServerResult,
+    SetLevelRequest, SetLevelRequestParam, SubscribeRequest, SubscribeRequestParam,
+    UnsubscribeRequest, UnsubscribeRequestParam,
 };
 
 use super::*;
-use futures::{Sink, SinkExt, Stream, StreamExt};
+use futures::{SinkExt, StreamExt};
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub struct RoleClient;
@@ -33,67 +33,64 @@ impl ServiceRole for RoleClient {
 
 pub type ServerSink = Peer<RoleClient>;
 
-pub async fn serve_client<S, T, E>(service: S, transport: T) -> Result<RunningService<S>, E>
+pub async fn serve_client<S, T, E, A>(mut service: S, transport: T) -> Result<RunningService<S>, E>
 where
     S: Service<Role = RoleClient>,
-    T: Stream<Item = ServerJsonRpcMessage>
-        + Sink<ClientJsonRpcMessage, Error = E>
-        + Send
-        + Unpin
-        + 'static,
+    T: IntoTransport<RoleClient, E, A>,
     E: std::error::Error + From<std::io::Error> + Send + Sync + 'static,
 {
+    let (sink, stream) = transport.into_transport();
+    let mut sink = Box::pin(sink);
+    let mut stream = Box::pin(stream);
+    let id_provider = <Arc<AtomicU32RequestIdProvider>>::default();
     // service
-    serve_inner(service, transport, async |s, t, id_provider| {
-        let id = id_provider.next_request_id();
-        let init_request = InitializeRequest {
-            method: Default::default(),
-            params: s.get_info(),
-        };
-        t.send(
-            ClientMessage::Request(ClientRequest::InitializeRequest(init_request), id.clone())
-                .into_json_rpc_message(),
+    let id = id_provider.next_request_id();
+    let init_request = InitializeRequest {
+        method: Default::default(),
+        params: service.get_info(),
+    };
+    sink.send(
+        ClientMessage::Request(ClientRequest::InitializeRequest(init_request), id.clone())
+            .into_json_rpc_message(),
+    )
+    .await?;
+    let (response, response_id) = stream
+        .next()
+        .await
+        .ok_or(std::io::Error::new(
+            std::io::ErrorKind::UnexpectedEof,
+            "expect initialize response",
+        ))?
+        .into_message()
+        .into_result()
+        .ok_or(std::io::Error::new(
+            std::io::ErrorKind::InvalidData,
+            "expect initialize result",
+        ))?;
+    if id != response_id {
+        return Err(std::io::Error::new(
+            std::io::ErrorKind::InvalidData,
+            "conflict initialize response id",
         )
-        .await?;
-        let (response, response_id) = t
-            .next()
-            .await
-            .ok_or(std::io::Error::new(
-                std::io::ErrorKind::UnexpectedEof,
-                "expect initialize response",
-            ))?
-            .into_message()
-            .into_result()
-            .ok_or(std::io::Error::new(
-                std::io::ErrorKind::InvalidData,
-                "expect initialize result",
-            ))?;
-        if id != response_id {
-            return Err(std::io::Error::new(
-                std::io::ErrorKind::InvalidData,
-                "conflict initialize response id",
-            )
-            .into());
-        }
-        let response = response.map_err(std::io::Error::other)?;
-        let ServerResult::InitializeResult(initialize_result) = response else {
-            return Err(std::io::Error::new(
-                std::io::ErrorKind::InvalidData,
-                "expect initialize result",
-            )
-            .into());
-        };
-        // send notification
-        let notification = ClientMessage::Notification(
-            ClientNotification::InitializedNotification(InitializedNotification {
-                method: Default::default(),
-            }),
-        );
-        t.send(notification.into_json_rpc_message()).await?;
-        s.set_peer_info(initialize_result.clone());
-        Ok(initialize_result)
-    })
-    .await
+        .into());
+    }
+    let response = response.map_err(std::io::Error::other)?;
+    let ServerResult::InitializeResult(initialize_result) = response else {
+        return Err(std::io::Error::new(
+            std::io::ErrorKind::InvalidData,
+            "expect initialize result",
+        )
+        .into());
+    };
+    // send notification
+    let notification = ClientMessage::Notification(ClientNotification::InitializedNotification(
+        InitializedNotification {
+            method: Default::default(),
+        },
+    ));
+    sink.send(notification.into_json_rpc_message()).await?;
+    service.set_peer_info(initialize_result.clone());
+    serve_inner(service, (sink, stream), initialize_result, id_provider).await
 }
 
 macro_rules! method {

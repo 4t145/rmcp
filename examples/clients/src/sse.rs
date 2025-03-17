@@ -5,8 +5,6 @@ use rmcp::{
 
 use tracing_subscriber::layer::SubscriberExt;
 use tracing_subscriber::util::SubscriberInitExt;
-mod common;
-use common::simple_client::SimpleClient;
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -20,14 +18,11 @@ async fn main() -> Result<()> {
         .init();
     let transport = SseTransport::start("http://localhost:8000/sse", Default::default()).await?;
 
-    let service = serve_client(
-        ClientHandlerService::new(SimpleClient::default()),
-        transport,
-    )
-    .await
-    .inspect_err(|e| {
-        tracing::error!("client error: {:?}", e);
-    })?;
+    let service = serve_client(ClientHandlerService::new(None), transport)
+        .await
+        .inspect_err(|e| {
+            tracing::error!("client error: {:?}", e);
+        })?;
 
     // Initialize
     let server_info = service.peer().info();

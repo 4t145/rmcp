@@ -11,47 +11,43 @@ use tokio_util::{
     codec::{Decoder, Encoder, FramedRead, FramedWrite},
 };
 
-use super::Transport;
-/// This function is used to create a transport using async read and write
-///
-/// # Examples
-///
-/// ```rust
-/// # use rmcp::{
-/// #     ClientHandlerService, ServerHandlerService, serve_client, serve_server, transport::io::async_rw,
-/// # };
-///
-/// // create transport from tcp stream
-/// async fn client() -> Result<(), Box<dyn std::error::Error>> {
-///     let stream = tokio::net::TcpSocket::new_v4()?
-///         .connect("127.0.0.1:8001".parse()?)
-///         .await?;
-///     let (rx, tx) = stream.into_split();
-///     let client = serve_client(ClientHandlerService::new(None), async_rw(rx, tx)).await?;
-///     let tools = client.peer().list_tools(Default::default()).await?;
-///     println!("{:?}", tools);
-///     Ok(())
-/// }
-///
-/// // create transport from std io
-/// async fn io()  -> Result<(), Box<dyn std::error::Error>> {
-///     let client = serve_client(ClientHandlerService::new(None), async_rw(tokio::io::stdin(), tokio::io::stdout())).await?;
-///     let tools = client.peer().list_tools(Default::default()).await?;
-///     println!("{:?}", tools);
-///     Ok(())
-/// }
-/// ```
-pub fn async_rw<I, O, R, W>(
-    read: R,
-    write: W,
-) -> impl Sink<O, Error = std::io::Error> + Stream<Item = I>
+use crate::service::{RxJsonRpcMessage, ServiceRole, TxJsonRpcMessage};
+
+use super::IntoTransport;
+pub enum TranportAdapterAsyncRW {}
+
+impl<Role, R, W> IntoTransport<Role, std::io::Error, TranportAdapterAsyncRW> for (R, W)
 where
-    R: AsyncRead,
-    W: AsyncWrite,
-    I: DeserializeOwned,
-    O: Serialize,
+    Role: ServiceRole,
+    R: AsyncRead + Send + 'static,
+    W: AsyncWrite + Send + 'static,
 {
-    Transport::new(from_async_write(write), from_async_read(read))
+    fn into_transport(
+        self,
+    ) -> (
+        impl Sink<TxJsonRpcMessage<Role>, Error = std::io::Error> + Send + 'static,
+        impl Stream<Item = RxJsonRpcMessage<Role>> + Send + 'static,
+    ) {
+        (from_async_write(self.1), from_async_read(self.0))
+    }
+}
+
+pub enum TranportAdapterAsyncCombinedRW {}
+impl<Role, S> IntoTransport<Role, std::io::Error, TranportAdapterAsyncCombinedRW> for S
+where
+    Role: ServiceRole,
+    S: AsyncRead + AsyncWrite + Send + 'static,
+{
+    fn into_transport(
+        self,
+    ) -> (
+        impl Sink<TxJsonRpcMessage<Role>, Error = std::io::Error> + Send + 'static,
+        impl Stream<Item = RxJsonRpcMessage<Role>> + Send + 'static,
+    ) {
+        IntoTransport::<Role, std::io::Error, TranportAdapterAsyncRW>::into_transport(
+            tokio::io::split(self),
+        )
+    }
 }
 
 pub fn from_async_read<T: DeserializeOwned, R: AsyncRead>(reader: R) -> impl Stream<Item = T> {
