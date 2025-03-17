@@ -14,7 +14,7 @@ pub use tool::*;
 pub type JsonObject<F = Value> = serde_json::Map<String, F>;
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Copy, Eq)]
-#[cfg_attr(feature = "default-json-schema", derive(schemars::JsonSchema))]
+#[cfg_attr(feature = "server", derive(schemars::JsonSchema))]
 pub struct EmptyObject {}
 
 pub trait ConstString: Default {
