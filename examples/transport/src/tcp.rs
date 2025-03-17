@@ -1,5 +1,6 @@
 use common::caculater::Calculater;
 use rmcp::{ClientHandlerService, ServerHandlerService, serve_client, serve_server};
+
 mod common;
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
