@@ -15,7 +15,7 @@ All the features listed on specification would be implemented in this crate. And
 
 ### Import from github
 ```toml
-rmcp = { git = "https://github.com/4t145/rust-mcp-sdk", features = ["server"] }
+rmcp = { version = "0.1", features = ["server"] }
 ```
 
 ### Quick start
