@@ -3,8 +3,14 @@ use crate::model::*;
 use crate::service::{Peer, RequestContext, RoleClient, Service, ServiceRole};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
-pub struct ClientHandlerService<H> {
+pub struct ClientHandlerService<H = Option<Peer<RoleClient>>> {
     pub handler: H,
+}
+
+impl ClientHandlerService<Option<Peer<RoleClient>>> {
+    pub fn simple() -> Self {
+        Self { handler: None }
+    }
 }
 
 impl<H: ClientHandler> ClientHandlerService<H> {
@@ -162,5 +168,16 @@ pub trait ClientHandler: Sized + Send + Sync + 'static {
 
     fn get_info(&self) -> ClientInfo {
         ClientInfo::default()
+    }
+}
+
+/// I will call it the "Default" client implementation.
+impl ClientHandler for Option<Peer<RoleClient>> {
+    fn get_peer(&self) -> Option<Peer<RoleClient>> {
+        self.clone()
+    }
+
+    fn set_peer(&mut self, peer: Peer<RoleClient>) {
+        *self = Some(peer);
     }
 }

@@ -5,8 +5,6 @@ use rmcp::{
 
 use tracing_subscriber::layer::SubscriberExt;
 use tracing_subscriber::util::SubscriberInitExt;
-mod common;
-use common::simple_client::SimpleClient;
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -20,32 +18,28 @@ async fn main() -> Result<()> {
         .init();
     let transport = SseTransport::start("http://localhost:8000/sse", Default::default()).await?;
 
-    let service = serve_client(
-        ClientHandlerService::new(SimpleClient::default()),
-        transport,
-    )
-    .await
-    .inspect_err(|e| {
-        tracing::error!("client error: {:?}", e);
-    })?;
+    let client = serve_client(ClientHandlerService::simple(), transport)
+        .await
+        .inspect_err(|e| {
+            tracing::error!("client error: {:?}", e);
+        })?;
 
     // Initialize
-    let server_info = service.peer().info();
+    let server_info = client.peer_info();
     tracing::info!("Connected to server: {server_info:#?}");
 
     // List tools
-    let tools = service.peer().list_tools(Default::default()).await?;
+    let tools = client.list_tools(Default::default()).await?;
     tracing::info!("Available tools: {tools:#?}");
 
     // Call tool 'git_status' with arguments = {"repo_path": "."}
-    let tool_result = service
-        .peer()
+    let tool_result = client
         .call_tool(CallToolRequestParam {
             name: "git_status".into(),
             arguments: serde_json::json!({ "repo_path": "." }).as_object().cloned(),
         })
         .await?;
     tracing::info!("Tool result: {tool_result:#?}");
-    service.cancel().await?;
+    client.cancel().await?;
     Ok(())
 }

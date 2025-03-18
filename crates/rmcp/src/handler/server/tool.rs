@@ -1,8 +1,5 @@
 use std::{
-    borrow::Cow,
-    future::Ready,
-    marker::PhantomData,
-    sync::{Arc, OnceLock},
+    any::TypeId, borrow::Cow, collections::HashMap, future::Ready, marker::PhantomData, sync::Arc,
 };
 
 use futures::future::BoxFuture;
@@ -27,11 +24,27 @@ pub fn schema_for_type<T: JsonSchema>() -> JsonObject {
 }
 
 /// Call [`schema_for_type`] with a cache
-pub fn cached_schema_for_type<T: JsonSchema>() -> Arc<JsonObject> {
-    static CACHE_FOR_TYPE: OnceLock<Arc<JsonObject>> = OnceLock::new();
-    CACHE_FOR_TYPE
-        .get_or_init(|| Arc::new(schema_for_type::<T>()))
-        .clone()
+pub fn cached_schema_for_type<T: JsonSchema + std::any::Any>() -> Arc<JsonObject> {
+    thread_local! {
+        static CACHE_FOR_TYPE: std::sync::RwLock<HashMap<TypeId, Arc<JsonObject>>> = Default::default();
+    };
+    CACHE_FOR_TYPE.with(|cache| {
+        if let Some(x) = cache
+            .read()
+            .expect("schema cache lock poisoned")
+            .get(&TypeId::of::<T>())
+        {
+            x.clone()
+        } else {
+            let schema = schema_for_type::<T>();
+            let schema = Arc::new(schema);
+            cache
+                .write()
+                .expect("schema cache lock poisoned")
+                .insert(TypeId::of::<T>(), schema.clone());
+            schema
+        }
+    })
 }
 
 /// Deserialize a JSON object into a type
@@ -149,7 +162,7 @@ pub trait CallToolHandler<'a, S, A> {
     fn call(self, context: ToolCallContext<'a, S>) -> Self::Fut;
 }
 
-pub type DynCallToolHanlder<S> = dyn Fn(ToolCallContext<'_, S>) -> BoxFuture<'_, Result<CallToolResult, crate::Error>>
+pub type DynCallToolHandler<S> = dyn Fn(ToolCallContext<'_, S>) -> BoxFuture<'_, Result<CallToolResult, crate::Error>>
     + Send
     + Sync;
 /// Parameter Extractor
@@ -358,7 +371,7 @@ macro_rules! impl_for {
 impl_for!(T0 T1 T2 T3 T4 T5 T6 T7 T8 T9 T10 T11 T12 T13 T14 T15);
 pub struct ToolBoxItem<S> {
     #[allow(clippy::type_complexity)]
-    pub call: Box<DynCallToolHanlder<S>>,
+    pub call: Box<DynCallToolHandler<S>>,
     pub attr: crate::model::Tool,
 }
 

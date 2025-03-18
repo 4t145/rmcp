@@ -32,6 +32,8 @@ impl Server {
         drop(city);
         "rain".to_string()
     }
+    #[tool(description = "Empty Parameter")]
+    async fn empty_param(&self) {}
 }
 
 #[tokio::test]
@@ -41,6 +43,14 @@ async fn test_tool_macros() {
     let _get_weather_call_fn = Server::get_weather_tool_call;
     let _get_weather_fn = Server::get_weather;
     server.get_weather("harbin".into()).await;
+}
+
+#[tokio::test]
+async fn test_tool_macros_with_empty_param() {
+    let _attr = Server::empty_param_tool_attr();
+    println!("{_attr:?}");
+    assert_eq!(_attr.input_schema.get("type").unwrap(), "object");
+    assert!(_attr.input_schema.get("properties").is_none());
 }
 
 impl GetWeatherRequest {}

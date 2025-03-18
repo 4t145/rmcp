@@ -1,0 +1,37 @@
+[package]
+name = "transport"
+edition.workspace = true
+version.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+description.workspace = true
+keywords.workspace = true
+homepage.workspace = true
+categories.workspace = true
+readme.workspace = true
+
+[package.metadata.docs.rs]
+all-features = true
+
+[dependencies]
+rmcp= { path = "../../crates/rmcp", features = ["server", "client"] }
+tokio = { version = "1", features = ["macros", "rt", "rt-multi-thread", "io-std", "net"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+anyhow = "1.0"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = [
+    "env-filter",
+    "std",
+    "fmt",
+] }
+futures = "0.3"
+rand = { version = "0.8" }
+schemars = { version = "0.8", optional = true }
+
+
+
+[[example]]
+name = "tcp"
+path = "src/tcp.rs"

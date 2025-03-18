@@ -1,6 +1,6 @@
 use crate::error::Error as McpError;
 use crate::model::{CancelledNotification, JsonRpcMessage, Message, RequestId};
-use futures::{Sink, Stream};
+use crate::transport::IntoTransport;
 use thiserror::Error;
 #[cfg(feature = "client")]
 mod client;
@@ -21,34 +21,51 @@ pub enum ServiceError {
     Transport(std::io::Error),
     #[error("Unexpected response type")]
     UnexpectedResponse,
-    #[error("task cancelled for reasion {}", reason.as_deref().unwrap_or("<unknown>"))]
+    #[error("task cancelled for reason {}", reason.as_deref().unwrap_or("<unknown>"))]
     Cancelled { reason: Option<String> },
 }
 
 impl ServiceError {}
-
-pub trait ServiceRole: std::fmt::Debug + Send + Sync + 'static + Clone + Copy {
-    type Req: std::fmt::Debug + Send + Sync + 'static;
-    type Resp: std::fmt::Debug + Send + Sync + 'static;
-    type Not: std::fmt::Debug
-        + TryInto<CancelledNotification, Error = Self::Not>
-        + From<CancelledNotification>
-        + Send
-        + Sync
-        + 'static;
-    type PeerReq: std::fmt::Debug + Send + Sync + 'static;
-    type PeerResp: std::fmt::Debug + Send + Sync + 'static;
-    type PeerNot: std::fmt::Debug
-        + TryInto<CancelledNotification, Error = Self::PeerNot>
-        + From<CancelledNotification>
-        + Send
-        + Sync
-        + 'static;
-    const IS_CLIENT: bool;
-    type Info: std::fmt::Debug + Send + Sync + 'static;
-    type PeerInfo: std::fmt::Debug + Send + Sync + Clone + 'static;
+trait TransferObject:
+    std::fmt::Debug + Clone + serde::Serialize + serde::de::DeserializeOwned + Send + Sync + 'static
+{
 }
 
+impl<T> TransferObject for T where
+    T: std::fmt::Debug
+        + serde::Serialize
+        + serde::de::DeserializeOwned
+        + Send
+        + Sync
+        + 'static
+        + Clone
+{
+}
+
+#[allow(private_bounds, reason = "there's no the third implementation")]
+pub trait ServiceRole: std::fmt::Debug + Send + Sync + 'static + Copy {
+    type Req: TransferObject;
+    type Resp: TransferObject;
+    type Not: TryInto<CancelledNotification, Error = Self::Not>
+        + From<CancelledNotification>
+        + TransferObject;
+    type PeerReq: TransferObject;
+    type PeerResp: TransferObject;
+    type PeerNot: TryInto<CancelledNotification, Error = Self::PeerNot>
+        + From<CancelledNotification>
+        + TransferObject;
+    const IS_CLIENT: bool;
+    type Info: TransferObject;
+    type PeerInfo: TransferObject;
+}
+
+pub(crate) type TxJsonRpcMessage<R> =
+    JsonRpcMessage<<R as ServiceRole>::Req, <R as ServiceRole>::Resp, <R as ServiceRole>::Not>;
+pub(crate) type RxJsonRpcMessage<R> = JsonRpcMessage<
+    <R as ServiceRole>::PeerReq,
+    <R as ServiceRole>::PeerResp,
+    <R as ServiceRole>::PeerNot,
+>;
 pub trait Service: Send + Sync + 'static {
     type Role: ServiceRole;
     fn handle_request(
@@ -68,6 +85,7 @@ pub trait Service: Send + Sync + 'static {
 }
 
 use std::collections::HashMap;
+use std::ops::Deref;
 use std::sync::Arc;
 use std::sync::atomic::AtomicU32;
 
@@ -121,7 +139,7 @@ pub enum PeerSinkMessage<R: ServiceRole> {
 
 /// An interface to fetch the remote client or server
 ///
-/// For general perpose, call [`Peer::send_request`] or [`Peer::send_notification`] to send message to remote peer.
+/// For general purpose, call [`Peer::send_request`] or [`Peer::send_notification`] to send message to remote peer.
 ///
 /// To create a cancellable request, call [`Peer::send_cancellable_request`].
 #[derive(Clone)]
@@ -185,7 +203,7 @@ impl<R: ServiceRole> Peer<R> {
             .map_err(|_m| ServiceError::Transport(std::io::Error::other("disconnected")))?;
         Ok(RequestHandle { id, rx: receiver })
     }
-    pub fn info(&self) -> &R::PeerInfo {
+    pub fn peer_info(&self) -> &R::PeerInfo {
         &self.info
     }
 }
@@ -197,6 +215,13 @@ pub struct RunningService<S: Service> {
     handle: tokio::task::JoinHandle<QuitReason>,
     /// cancellation token
     ct: CancellationToken,
+}
+impl<S: Service> Deref for RunningService<S> {
+    type Target = Peer<S::Role>;
+
+    fn deref(&self) -> &Self::Target {
+        self.peer()
+    }
 }
 
 impl<S: Service> RunningService<S> {
@@ -234,62 +259,28 @@ pub struct RequestContext<R: ServiceRole> {
 }
 
 /// Use this function to skip initialization process
-pub async fn serve_directly<S, T, E>(
+pub async fn serve_directly<S, T, E, A>(
     service: S,
     transport: T,
     peer_info: <S::Role as ServiceRole>::PeerInfo,
 ) -> Result<RunningService<S>, E>
 where
     S: Service,
-    T: Stream<
-            Item = JsonRpcMessage<
-                <S::Role as ServiceRole>::PeerReq,
-                <S::Role as ServiceRole>::PeerResp,
-                <S::Role as ServiceRole>::PeerNot,
-            >,
-        > + Sink<
-            JsonRpcMessage<
-                <S::Role as ServiceRole>::Req,
-                <S::Role as ServiceRole>::Resp,
-                <S::Role as ServiceRole>::Not,
-            >,
-            Error = E,
-        > + Send
-        + Unpin
-        + 'static,
+    T: IntoTransport<S::Role, E, A>,
     E: std::error::Error + Send + Sync + 'static,
 {
-    serve_inner(service, transport, async |_, _, _| Ok(peer_info)).await
+    serve_inner(service, transport, peer_info, Default::default()).await
 }
 
-async fn serve_inner<S, T, E>(
+async fn serve_inner<S, T, E, A>(
     mut service: S,
-    mut transport: T,
-    initial_hook: impl AsyncFnOnce(
-        &mut S,
-        &mut T,
-        &Arc<AtomicU32RequestIdProvider>,
-    ) -> Result<<S::Role as ServiceRole>::PeerInfo, E>
-    + Send,
+    transport: T,
+    peer_info: <S::Role as ServiceRole>::PeerInfo,
+    id_provider: Arc<AtomicU32RequestIdProvider>,
 ) -> Result<RunningService<S>, E>
 where
     S: Service,
-    T: Stream<
-            Item = JsonRpcMessage<
-                <S::Role as ServiceRole>::PeerReq,
-                <S::Role as ServiceRole>::PeerResp,
-                <S::Role as ServiceRole>::PeerNot,
-            >,
-        > + Sink<
-            JsonRpcMessage<
-                <S::Role as ServiceRole>::Req,
-                <S::Role as ServiceRole>::Resp,
-                <S::Role as ServiceRole>::Not,
-            >,
-            Error = E,
-        > + Send
-        + Unpin
-        + 'static,
+    T: IntoTransport<S::Role, E, A>,
     E: std::error::Error + Send + Sync + 'static,
 {
     use futures::{SinkExt, StreamExt};
@@ -302,14 +293,11 @@ where
             <S::Role as ServiceRole>::Not,
         >,
     >(SINK_PROXY_BUFFER_SIZE);
-    let id_provider = Arc::new(AtomicU32RequestIdProvider::default());
-    // call initialize hook
-    let peer_info = initial_hook(&mut service, &mut transport, &id_provider).await?;
 
     if S::Role::IS_CLIENT {
-        tracing::info!("Initialized as client");
+        tracing::info!(?peer_info, "Server initialized as client");
     } else {
-        tracing::info!("Initialized as server");
+        tracing::info!(?peer_info, "Server initialized as server");
     }
 
     let (peer, mut peer_proxy) = <Peer<S::Role>>::new(id_provider, peer_info);
@@ -322,11 +310,13 @@ where
 
     // let message_sink = tokio::sync::
     // let mut stream = std::pin::pin!(stream);
-    let (mut sink, mut stream) = transport.split();
     let ct = CancellationToken::new();
     let serve_loop_ct = ct.child_token();
     let peer_return: Peer<<S as Service>::Role> = peer.clone();
     let handle = tokio::spawn(async move {
+        let (mut sink, mut stream) = transport.into_transport();
+        let mut sink = std::pin::pin!(sink);
+        let mut stream = std::pin::pin!(stream);
         #[derive(Debug)]
         enum Event<P, R, T> {
             ProxyMessage(P),
@@ -347,7 +337,7 @@ where
                         Event::PeerMessage(m.into_message())
                     } else {
                         // input stream closed
-                        tracing::info!("input stream tarminated");
+                        tracing::info!("input stream terminated");
                         break QuitReason::Closed
                     }
                 }

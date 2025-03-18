@@ -1,7 +1,7 @@
 # RMCP
 [![Crates.io Version](https://img.shields.io/crates/v/rmcp)](https://crates.io/crates/rmcp)
 ![Release status](https://github.com/4t145/rmcp/actions/workflows/release.yml/badge.svg)
-[![docs.rs](https://img.shields.io/docsrs/rmcp)](https://docs.rs/rmcp/rmcp)
+[![docs.rs](https://img.shields.io/docsrs/rmcp)](https://docs.rs/rmcp/latest/rmcp)
 
 A better and clean rust Model Context Protocol SDK implementation with tokio async runtime.
 
@@ -15,21 +15,28 @@ All the features listed on specification would be implemented in this crate. And
 
 ### Import from github
 ```toml
-rmcp = { git = "https://github.com/4t145/rust-mcp-sdk", features = ["server"] }
+rmcp = { version = "0.1", features = ["server"] }
 ```
 
 ### Quick start
 
 #### 1. Build a transport
-- A transport type for client should be a `Sink` of `ClientJsonRpcMessage` and a `Stream` of `ServerJsonRpcMessage`
-- A transport type for server should be a `Sink` of `ServerJsonRpcMessage` and a `Stream` of `ClientJsonRpcMessage`
+The transport type must implemented [`IntoTransport`] trait, which allow split into a sink and a stream.
 
-We already have some transport type or builder function in [`rmcp::transport`](crates/rmcp/src/transport.rs).
+For client, the sink item is [`ClientJsonRpcMessage`](crate::model::ClientJsonRpcMessage) and stream item is [`ServerJsonRpcMessage`](crate::model::ServerJsonRpcMessage)
+
+For server, the sink item is [`ServerJsonRpcMessage`](crate::model::ServerJsonRpcMessage) and stream item is [`ClientJsonRpcMessage`](crate::model::ClientJsonRpcMessage)
+
+##### These types is automatically implemented [`IntoTransport`] trait
+1. For type that already implement both [`Sink`] and [`Stream`] trait, they are automatically implemented [`IntoTransport`] trait
+2. For tuple of sink `Tx` and stream `Rx`, type `(Tx, Rx)` are automatically implemented [`IntoTransport`] trait
+3. For type that implement both [`tokio::io::AsyncRead`] and [`tokio::io::AsyncWrite`] trait, they are automatically implemented [`IntoTransport`] trait
+4. For tuple of [`tokio::io::AsyncRead`] `R `and [`tokio::io::AsyncWrite`] `W`, type `(R, W)` are automatically implemented [`IntoTransport`] trait
+
 
 ```rust
-use rmcp::transport::io::async_rw;
 use tokio::io::{stdin, stdout};
-let transport = async_rw(stdin(), stdout());
+let transport = (stdin(), stdout());
 ```
 
 #### 2. Build a service
@@ -44,19 +51,20 @@ You can reference the [server examples](examples/servers/src/common/counter.rs).
 
 #### 3. Serve them together
 ```rust
-// this call will finishe the initialization process
+// this call will finish the initialization process
 let server = rmcp::serve_server(service, transport).await?;
 ```
 
-#### 4. Get remote interface by `peer()`
+#### 4. Interact with the server
+Once the server is initialized, you can send requests or notifications:
+
 ```rust
 // request 
-let roots = server.peer().list_roots().await?;
+let roots = server.list_roots().await?;
 
 // or send notification
-server.peer().notify_cancelled(...).await?;
+server.notify_cancelled(...).await?;
 ```
-For client, you will get server's api. And for server, you will get client api.
 
 #### 5. Waiting for service shutdown
 ```rust
@@ -68,7 +76,7 @@ let quit_reason = server.cancel().await?;
 ### Use marcos to declaring tool
 Use `toolbox` and `tool` macros to create tool quickly.
 
-Check this [file](examples/servers/src/common/caculater.rs).
+Check this [file](examples/servers/src/common/calculator.rs).
 ```rust
 use rmcp::{ServerHandler, model::ServerInfo, schemars, tool, tool_box};
 
@@ -81,8 +89,8 @@ pub struct SumRequest {
     pub b: i32,
 }
 #[derive(Debug, Clone)]
-pub struct Calculater;
-impl Calculater {
+pub struct Calculator;
+impl Calculator {
     // async function
     #[tool(description = "Calculate the sum of two numbers")]
     fn async sum(&self, #[tool(aggr)] SumRequest { a, b }: SumRequest) -> String {
@@ -105,20 +113,20 @@ impl Calculater {
     }
 
     // create a static toolbox to store the tool attributes
-    tool_box!(Calculater { sum, sub });
+    tool_box!(Calculator { sum, sub });
 }
 
-impl ServerHandler for Calculater {
-    // impl call_tool and list_tool by quering static toolbox
+impl ServerHandler for Calculator {
+    // impl call_tool and list_tool by querying static toolbox
     tool_box!(@derive);
-    
     fn get_info(&self) -> ServerInfo {
         ServerInfo {
-            instructions: Some("A simple caculator".into()),
+            instructions: Some("A simple calculator".into()),
             ..Default::default()
         }
     }
 }
+
 ```
 The only thing you should do is to make the function's return type implement `IntoCallToolResult`.
 
