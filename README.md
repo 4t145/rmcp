@@ -31,11 +31,10 @@ For server, the sink item is [`ServerJsonRpcMessage`](crate::model::ServerJsonRp
 1. For type that already implement both [`Sink`] and [`Stream`] trait, they are automatically implemented [`IntoTransport`] trait
 2. For tuple of sink `Tx` and stream `Rx`, type `(Tx, Rx)` are automatically implemented [`IntoTransport`] trait
 3. For type that implement both [`tokio::io::AsyncRead`] and [`tokio::io::AsyncWrite`] trait, they are automatically implemented [`IntoTransport`] trait
-4. For tulpe of [`tokio::io::AsyncRead`] `R `and [`tokio::io::AsyncWrite`] `W`, type `(R, W)` are automatically implemented [`IntoTransport`] trait
+4. For tuple of [`tokio::io::AsyncRead`] `R `and [`tokio::io::AsyncWrite`] `W`, type `(R, W)` are automatically implemented [`IntoTransport`] trait
 
 
 ```rust
-use rmcp::transport::io::async_rw;
 use tokio::io::{stdin, stdout};
 let transport = (stdin(), stdout());
 ```
@@ -52,7 +51,7 @@ You can reference the [server examples](examples/servers/src/common/counter.rs).
 
 #### 3. Serve them together
 ```rust
-// this call will finishe the initialization process
+// this call will finish the initialization process
 let server = rmcp::serve_server(service, transport).await?;
 ```
 
@@ -89,8 +88,8 @@ pub struct SumRequest {
     pub b: i32,
 }
 #[derive(Debug, Clone)]
-pub struct Calculater;
-impl Calculater {
+pub struct Calculator;
+impl Calculator {
     // async function
     #[tool(description = "Calculate the sum of two numbers")]
     fn async sum(&self, #[tool(aggr)] SumRequest { a, b }: SumRequest) -> String {
@@ -113,16 +112,16 @@ impl Calculater {
     }
 
     // create a static toolbox to store the tool attributes
-    tool_box!(Calculater { sum, sub });
+    tool_box!(Calculator { sum, sub });
 }
 
-impl ServerHandler for Calculater {
-    // impl call_tool and list_tool by quering static toolbox
+impl ServerHandler for Calculator {
+    // impl call_tool and list_tool by querying static toolbox
     tool_box!(@derive);
     
     fn get_info(&self) -> ServerInfo {
         ServerInfo {
-            instructions: Some("A simple caculator".into()),
+            instructions: Some("A simple calculator".into()),
             ..Default::default()
         }
     }

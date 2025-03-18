@@ -9,7 +9,7 @@
 //! 1. For type that already implement both [`Sink`] and [`Stream`] trait, they are automatically implemented [`IntoTransport`] trait
 //! 2. For tuple of sink `Tx` and stream `Rx`, type `(Tx, Rx)` are automatically implemented [`IntoTransport`] trait
 //! 3. For type that implement both [`tokio::io::AsyncRead`] and [`tokio::io::AsyncWrite`] trait, they are automatically implemented [`IntoTransport`] trait
-//! 4. For tulpe of [`tokio::io::AsyncRead`] `R `and [`tokio::io::AsyncWrite`] `W`, type `(R, W)` are automatically implemented [`IntoTransport`] trait
+//! 4. For tuple of [`tokio::io::AsyncRead`] `R `and [`tokio::io::AsyncWrite`] `W`, type `(R, W)` are automatically implemented [`IntoTransport`] trait
 //!
 //! ## Examples
 //!
@@ -63,9 +63,9 @@ where
     );
 }
 
-pub enum TranportAdapterStreamSink {}
+pub enum TransportAdapterStreamSink {}
 
-impl<Role, Rx, Tx, E> IntoTransport<Role, E, TranportAdapterStreamSink> for (Tx, Rx)
+impl<Role, Rx, Tx, E> IntoTransport<Role, E, TransportAdapterStreamSink> for (Tx, Rx)
 where
     Role: ServiceRole,
     Tx: Sink<TxJsonRpcMessage<Role>, Error = E> + Send + 'static,
