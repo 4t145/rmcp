@@ -1,7 +1,11 @@
 {
     "cSpell.words": [
-        "Ciovec",
-        "Iovec",
-        "Wasi"
+      "aggr",
+      "Ciovec",
+      "Iovec",
+      "RMCP",
+      "schemars",
+      "thiserror",
+      "Wasi"
     ]
 }

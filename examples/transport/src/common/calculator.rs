@@ -34,7 +34,7 @@ impl ServerHandler for Calculator {
     tool_box!(@derive);
     fn get_info(&self) -> ServerInfo {
         ServerInfo {
-            instructions: Some("A simple caculator".into()),
+            instructions: Some("A simple calculator".into()),
             ..Default::default()
         }
     }
