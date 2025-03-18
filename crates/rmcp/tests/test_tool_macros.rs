@@ -54,11 +54,7 @@ async fn test_tool_macros_with_empty_param() {
         _attr
             .input_schema
             .get("properties")
-            .unwrap()
-            .as_object()
-            .as_ref()
-            .unwrap()
-            .is_empty()
+            .is_none()
     );
 }
 
