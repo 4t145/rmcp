@@ -3,8 +3,14 @@ use crate::model::*;
 use crate::service::{Peer, RequestContext, RoleClient, Service, ServiceRole};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
-pub struct ClientHandlerService<H> {
+pub struct ClientHandlerService<H = Option<Peer<RoleClient>>> {
     pub handler: H,
+}
+
+impl ClientHandlerService<Option<Peer<RoleClient>>> {
+    pub fn simple() -> Self {
+        Self { handler: None }
+    }
 }
 
 impl<H: ClientHandler> ClientHandlerService<H> {
