@@ -21,7 +21,7 @@ pub enum ServiceError {
     Transport(std::io::Error),
     #[error("Unexpected response type")]
     UnexpectedResponse,
-    #[error("task cancelled for reasion {}", reason.as_deref().unwrap_or("<unknown>"))]
+    #[error("task cancelled for reason {}", reason.as_deref().unwrap_or("<unknown>"))]
     Cancelled { reason: Option<String> },
 }
 
@@ -139,7 +139,7 @@ pub enum PeerSinkMessage<R: ServiceRole> {
 
 /// An interface to fetch the remote client or server
 ///
-/// For general perpose, call [`Peer::send_request`] or [`Peer::send_notification`] to send message to remote peer.
+/// For general purpose, call [`Peer::send_request`] or [`Peer::send_notification`] to send message to remote peer.
 ///
 /// To create a cancellable request, call [`Peer::send_cancellable_request`].
 #[derive(Clone)]
@@ -337,7 +337,7 @@ where
                         Event::PeerMessage(m.into_message())
                     } else {
                         // input stream closed
-                        tracing::info!("input stream tarminated");
+                        tracing::info!("input stream terminated");
                         break QuitReason::Closed
                     }
                 }

@@ -1,11 +1,12 @@
 {
     "cSpell.words": [
-      "aggr",
-      "Ciovec",
-      "Iovec",
-      "RMCP",
-      "schemars",
-      "thiserror",
-      "Wasi"
+        "aggr",
+        "Ciovec",
+        "Iovec",
+        "modelcontextprotocol",
+        "rmcp",
+        "schemars",
+        "thiserror",
+        "Wasi"
     ]
 }

@@ -31,11 +31,10 @@ For server, the sink item is [`ServerJsonRpcMessage`](crate::model::ServerJsonRp
 1. For type that already implement both [`Sink`] and [`Stream`] trait, they are automatically implemented [`IntoTransport`] trait
 2. For tuple of sink `Tx` and stream `Rx`, type `(Tx, Rx)` are automatically implemented [`IntoTransport`] trait
 3. For type that implement both [`tokio::io::AsyncRead`] and [`tokio::io::AsyncWrite`] trait, they are automatically implemented [`IntoTransport`] trait
-4. For tulpe of [`tokio::io::AsyncRead`] `R `and [`tokio::io::AsyncWrite`] `W`, type `(R, W)` are automatically implemented [`IntoTransport`] trait
+4. For tuple of [`tokio::io::AsyncRead`] `R `and [`tokio::io::AsyncWrite`] `W`, type `(R, W)` are automatically implemented [`IntoTransport`] trait
 
 
 ```rust
-use rmcp::transport::io::async_rw;
 use tokio::io::{stdin, stdout};
 let transport = (stdin(), stdout());
 ```
@@ -92,6 +91,7 @@ pub struct SumRequest {
 #[derive(Debug, Clone)]
 pub struct Calculator;
 impl Calculator {
+    // async function
     #[tool(description = "Calculate the sum of two numbers")]
     fn async sum(&self, #[tool(aggr)] SumRequest { a, b }: SumRequest) -> String {
         (a + b).to_string()
@@ -112,10 +112,12 @@ impl Calculator {
         (a - b).to_string()
     }
 
+    // create a static toolbox to store the tool attributes
     tool_box!(Calculator { sum, sub });
 }
 
 impl ServerHandler for Calculator {
+    // impl call_tool and list_tool by querying static toolbox
     tool_box!(@derive);
     fn get_info(&self) -> ServerInfo {
         ServerInfo {
