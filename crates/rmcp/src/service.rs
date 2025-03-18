@@ -85,6 +85,7 @@ pub trait Service: Send + Sync + 'static {
 }
 
 use std::collections::HashMap;
+use std::ops::Deref;
 use std::sync::Arc;
 use std::sync::atomic::AtomicU32;
 
@@ -202,7 +203,7 @@ impl<R: ServiceRole> Peer<R> {
             .map_err(|_m| ServiceError::Transport(std::io::Error::other("disconnected")))?;
         Ok(RequestHandle { id, rx: receiver })
     }
-    pub fn info(&self) -> &R::PeerInfo {
+    pub fn peer_info(&self) -> &R::PeerInfo {
         &self.info
     }
 }
@@ -214,6 +215,13 @@ pub struct RunningService<S: Service> {
     handle: tokio::task::JoinHandle<QuitReason>,
     /// cancellation token
     ct: CancellationToken,
+}
+impl<S: Service> Deref for RunningService<S> {
+    type Target = Peer<S::Role>;
+
+    fn deref(&self) -> &Self::Target {
+        self.peer()
+    }
 }
 
 impl<S: Service> RunningService<S> {

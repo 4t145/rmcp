@@ -55,15 +55,16 @@ You can reference the [server examples](examples/servers/src/common/counter.rs).
 let server = rmcp::serve_server(service, transport).await?;
 ```
 
-#### 4. Get remote interface by `peer()`
+#### 4. Interact with the server
+Once the server is initialized, you can send requests or notifications:
+
 ```rust
 // request 
-let roots = server.peer().list_roots().await?;
+let roots = server.list_roots().await?;
 
 // or send notification
-server.peer().notify_cancelled(...).await?;
+server.notify_cancelled(...).await?;
 ```
-For client, you will get server's api. And for server, you will get client api.
 
 #### 5. Waiting for service shutdown
 ```rust
@@ -75,7 +76,7 @@ let quit_reason = server.cancel().await?;
 ### Use marcos to declaring tool
 Use `toolbox` and `tool` macros to create tool quickly.
 
-Check this [file](examples/servers/src/common/caculater.rs).
+Check this [file](examples/servers/src/common/calculator.rs).
 ```rust
 use rmcp::{ServerHandler, model::ServerInfo, schemars, tool, tool_box};
 
@@ -118,7 +119,6 @@ impl Calculator {
 impl ServerHandler for Calculator {
     // impl call_tool and list_tool by querying static toolbox
     tool_box!(@derive);
-    
     fn get_info(&self) -> ServerInfo {
         ServerInfo {
             instructions: Some("A simple calculator".into()),
@@ -126,6 +126,7 @@ impl ServerHandler for Calculator {
         }
     }
 }
+
 ```
 The only thing you should do is to make the function's return type implement `IntoCallToolResult`.
 
