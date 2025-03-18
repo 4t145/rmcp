@@ -86,10 +86,14 @@ use super::counter::Counter;
 pub struct SumRequest {
     #[schemars(description = "the left hand side number")]
     pub a: i32,
+    #[schemars(description = "the right hand side number")]
     pub b: i32,
 }
 #[derive(Debug, Clone)]
 pub struct Calculator;
+
+// create a static toolbox to store the tool attributes
+#[tool(tool_box)]
 impl Calculator {
     // async function
     #[tool(description = "Calculate the sum of two numbers")]
@@ -106,19 +110,16 @@ impl Calculator {
         #[schemars(description = "the left hand side number")]
         a: i32,
         #[tool(param)]
-        #[schemars(description = "the left hand side number")]
+        #[schemars(description = "the right hand side number")]
         b: i32,
     ) -> String {
         (a - b).to_string()
     }
-
-    // create a static toolbox to store the tool attributes
-    tool_box!(Calculator { sum, sub });
 }
 
+// impl call_tool and list_tool by querying static toolbox
+#[tool(tool_box)]
 impl ServerHandler for Calculator {
-    // impl call_tool and list_tool by querying static toolbox
-    tool_box!(@derive);
     fn get_info(&self) -> ServerInfo {
         ServerInfo {
             instructions: Some("A simple calculator".into()),

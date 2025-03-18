@@ -366,7 +366,6 @@ macro_rules! impl_for {
             }
         }
     };
-
 }
 impl_for!(T0 T1 T2 T3 T4 T5 T6 T7 T8 T9 T10 T11 T12 T13 T14 T15);
 pub struct ToolBoxItem<S> {
@@ -435,8 +434,11 @@ macro_rules! tool_box {
     (@pin_add $callee: ident, $attr: expr, $f: expr) => {
         $callee.add(ToolBoxItem::new($attr, |context| Box::pin($f(context))));
     };
-    ($server: ident { $($tool: ident),* $(,)?}) => {
-        fn tool_box() -> &'static $crate::handler::server::tool::ToolBox<$server> {
+    ($server: ident { $($tool: ident),* $(,)?} ) => {
+        $crate::tool_box!($server { $($tool),* }  tool_box);
+    };
+    ($server: ident { $($tool: ident),* $(,)?} $tool_box: ident) => {
+        fn $tool_box() -> &'static $crate::handler::server::tool::ToolBox<$server> {
             use $crate::handler::server::tool::{ToolBox, ToolBoxItem};
             static TOOL_BOX: std::sync::OnceLock<ToolBox<$server>> = std::sync::OnceLock::new();
             TOOL_BOX.get_or_init(|| {
@@ -451,6 +453,10 @@ macro_rules! tool_box {
         }
     };
     (@derive) => {
+        $crate::tool_box!(@derive tool_box);
+    };
+
+    (@derive $tool_box:ident) => {
         async fn list_tools(
             &self,
             _: $crate::model::PaginatedRequestParam,
@@ -468,7 +474,7 @@ macro_rules! tool_box {
             context: $crate::service::RequestContext<$crate::service::RoleServer>,
         ) -> Result<$crate::model::CallToolResult, $crate::Error> {
             let context = $crate::handler::server::tool::ToolCallContext::new(self, call_tool_request_param, context);
-            Self::tool_box().call(context).await
+            Self::$tool_box().call(context).await
         }
     }
 }

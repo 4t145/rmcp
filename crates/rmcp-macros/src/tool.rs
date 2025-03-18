@@ -3,9 +3,42 @@ use std::collections::HashSet;
 use proc_macro2::TokenStream;
 use quote::{ToTokens, quote};
 use syn::{
-    Expr, FnArg, Ident, ItemFn, MetaList, PatType, Token, Type, Visibility, parse::Parse,
+    Expr, FnArg, Ident, ItemFn, ItemImpl, MetaList, PatType, Token, Type, Visibility, parse::Parse,
     parse_quote,
 };
+
+#[derive(Default)]
+struct ToolImplItemAttrs {
+    tool_box: Option<Option<Ident>>,
+}
+
+impl Parse for ToolImplItemAttrs {
+    fn parse(input: syn::parse::ParseStream) -> syn::Result<Self> {
+        let mut tool_box = None;
+        while !input.is_empty() {
+            let key: Ident = input.parse()?;
+            match key.to_string().as_str() {
+                "tool_box" => {
+                    tool_box = Some(None);
+                    if input.lookahead1().peek(Token![=]) {
+                        let value: Ident = input.parse()?;
+                        tool_box = Some(Some(value));
+                    }
+                }
+                _ => {
+                    return Err(syn::Error::new(key.span(), "unknown attribute"));
+                }
+            }
+            if input.is_empty() {
+                break;
+            }
+            input.parse::<Token![,]>()?;
+        }
+
+        Ok(ToolImplItemAttrs { tool_box })
+    }
+}
+
 #[derive(Default)]
 struct ToolFnItemAttrs {
     name: Option<Expr>,
@@ -114,11 +147,69 @@ impl Parse for ParamMarker {
     }
 }
 
+pub enum ToolItem {
+    Fn(ItemFn),
+    Impl(ItemImpl),
+}
+
+impl Parse for ToolItem {
+    fn parse(input: syn::parse::ParseStream) -> syn::Result<Self> {
+        let lookahead = input.lookahead1();
+        if lookahead.peek(Token![impl]) {
+            let item = input.parse::<ItemImpl>()?;
+            Ok(ToolItem::Impl(item))
+        } else {
+            let item = input.parse::<ItemFn>()?;
+            Ok(ToolItem::Fn(item))
+        }
+    }
+}
+
+// dispatch impl function item and impl block item
 pub(crate) fn tool(attr: TokenStream, input: TokenStream) -> syn::Result<TokenStream> {
+    let tool_item = syn::parse2::<ToolItem>(input)?;
+    match tool_item {
+        ToolItem::Fn(item) => tool_fn_item(attr, item),
+        ToolItem::Impl(item) => tool_impl_item(attr, item),
+    }
+}
+
+pub(crate) fn tool_impl_item(attr: TokenStream, mut input: ItemImpl) -> syn::Result<TokenStream> {
+    let tool_impl_attr: ToolImplItemAttrs = syn::parse2(attr)?;
+    let tool_box_ident = tool_impl_attr.tool_box;
+    if input.trait_.is_some() {
+        if let Some(ident) = tool_box_ident {
+            input.items.push(parse_quote!(
+                rmcp::tool_box!(@derive #ident);
+            ));
+        }
+    } else if let Some(ident) = tool_box_ident {
+        let mut tool_fn_idents = Vec::new();
+        for item in &input.items {
+            if let syn::ImplItem::Fn(method) = item {
+                for attr in &method.attrs {
+                    if attr.path().is_ident(TOOL_IDENT) {
+                        tool_fn_idents.push(method.sig.ident.clone());
+                    }
+                }
+            }
+        }
+        let this_type_ident = &input.self_ty;
+        input.items.push(parse_quote!(
+            rmcp::tool_box!(#this_type_ident {
+                #(#tool_fn_idents),*
+            } #ident);
+        ));
+    }
+    Ok(quote! {
+        #input
+    })
+}
+
+pub(crate) fn tool_fn_item(attr: TokenStream, mut input_fn: ItemFn) -> syn::Result<TokenStream> {
     let mut tool_macro_attrs = ToolAttrs::default();
     let args: ToolFnItemAttrs = syn::parse2(attr)?;
     tool_macro_attrs.fn_item = args;
-    let mut input_fn = syn::parse2::<ItemFn>(input)?;
     // let mut fommated_fn_args: Punctuated<FnArg, Comma> = Punctuated::new();
     let mut unextractable_args_indexes = HashSet::new();
     for (index, mut fn_arg) in input_fn.sig.inputs.iter_mut().enumerate() {
@@ -440,6 +531,26 @@ mod test {
         let input = quote! {
             fn sum(&self, #[tool(aggr)] req: StructRequest) -> Result<CallToolResult, McpError> {
                 Ok(CallToolResult::success(vec![Content::text((req.a + req.b).to_string())]))
+            }
+        };
+        let input = tool(attr, input)?;
+
+        println!("input: {:#}", input);
+        Ok(())
+    }
+
+    #[test]
+    fn test_trait_tool_macro() -> syn::Result<()> {
+        let attr = quote! {};
+        let input = quote! {
+            impl ServerHandler for Calculator {
+                tool_box!(@derive);
+                fn get_info(&self) -> ServerInfo {
+                    ServerInfo {
+                        instructions: Some("A simple calculator".into()),
+                        ..Default::default()
+                    }
+                }
             }
         };
         let input = tool(attr, input)?;

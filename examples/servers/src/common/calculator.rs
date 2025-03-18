@@ -1,4 +1,8 @@
-use rmcp::{ServerHandler, model::ServerInfo, schemars, tool, tool_box};
+use rmcp::{
+    ServerHandler,
+    model::{ServerCapabilities, ServerInfo},
+    schemars, tool,
+};
 
 #[derive(Debug, serde::Deserialize, schemars::JsonSchema)]
 pub struct SumRequest {
@@ -8,6 +12,7 @@ pub struct SumRequest {
 }
 #[derive(Debug, Clone)]
 pub struct Calculator;
+#[tool(tool_box)]
 impl Calculator {
     #[tool(description = "Calculate the sum of two numbers")]
     fn sum(&self, #[tool(aggr)] SumRequest { a, b }: SumRequest) -> String {
@@ -26,15 +31,17 @@ impl Calculator {
     ) -> String {
         (a - b).to_string()
     }
-
-    tool_box!(Calculator { sum, sub });
 }
 
+#[tool(tool_box)]
 impl ServerHandler for Calculator {
-    tool_box!(@derive);
     fn get_info(&self) -> ServerInfo {
         ServerInfo {
             instructions: Some("A simple calculator".into()),
+            capabilities: ServerCapabilities {
+                tools: Some(Default::default()),
+                ..Default::default()
+            },
             ..Default::default()
         }
     }
