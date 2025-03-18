@@ -1,1 +1,1 @@
-pub mod caculater;
+pub mod calculator;
