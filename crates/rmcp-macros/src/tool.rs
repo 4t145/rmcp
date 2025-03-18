@@ -245,7 +245,7 @@ pub(crate) fn tool(attr: TokenStream, input: TokenStream) -> syn::Result<TokenSt
             }
             ToolParams::NoParam => {
                 quote! {
-                    rmcp::model::JsonObject::new()
+                    rmcp::handler::server::tool::cached_schema_for_type::<rmcp::model::EmptyObject>()
                 }
             }
         };
