@@ -5,7 +5,7 @@ use rmcp::{
         CallToolRequestParam, GetPromptRequestParam, PaginatedRequestParam,
         ReadResourceRequestParam,
     },
-    serve_client,
+    object, serve_client,
     transport::child_process::TokioChildProcess,
 };
 
@@ -49,9 +49,7 @@ async fn main() -> Result<()> {
     let tool_result = service
         .call_tool(CallToolRequestParam {
             name: "echo".into(),
-            arguments: serde_json::json!({ "message": "hi from rmcp" })
-                .as_object()
-                .cloned(),
+            arguments: Some(object!({ "message": "hi from rmcp" })),
         })
         .await?;
     tracing::info!("Tool result for echo: {tool_result:#?}");
@@ -60,9 +58,7 @@ async fn main() -> Result<()> {
     let tool_result = service
         .call_tool(CallToolRequestParam {
             name: "longRunningOperation".into(),
-            arguments: serde_json::json!({ "duration": 3, "steps": 1 })
-                .as_object()
-                .cloned(),
+            arguments: Some(object!({ "duration": 3, "steps": 1 })),
         })
         .await?;
     tracing::info!("Tool result for longRunningOperation: {tool_result:#?}");
@@ -100,9 +96,7 @@ async fn main() -> Result<()> {
     let prompt = service
         .get_prompt(GetPromptRequestParam {
             name: "complex_prompt".into(),
-            arguments: serde_json::json!({ "temperature": "0.5", "style": "formal" })
-                .as_object()
-                .cloned(),
+            arguments: Some(object!({ "temperature": "0.5", "style": "formal" })),
         })
         .await?;
     tracing::info!("Prompt - complex: {prompt:#?}");

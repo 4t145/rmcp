@@ -28,7 +28,7 @@ pub struct TokioChildProcess {
     child_stdout: ChildStdout,
 }
 
-// we hold the child process with stdout, for it's easier to read implement
+// we hold the child process with stdout, for it's easier to implement AsyncRead
 pin_project_lite::pin_project! {
     pub struct TokioChildProcessOut {
         child: tokio::process::Child,

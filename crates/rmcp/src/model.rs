@@ -17,6 +17,27 @@ use serde_json::Value;
 pub use tool::*;
 pub type JsonObject<F = Value> = serde_json::Map<String, F>;
 
+/// unwrap the JsonObject under [`serde_json::Value`]
+///
+/// # Panic
+/// This will panic when the value is not a object in debug mode.
+pub fn object(value: serde_json::Value) -> JsonObject {
+    debug_assert!(value.is_object());
+    match value {
+        serde_json::Value::Object(map) => map,
+        _ => JsonObject::default(),
+    }
+}
+
+#[cfg(feature = "macros")]
+#[macro_export]
+macro_rules! object {
+    ({$($tt:tt)*}) => {
+        $crate::model::object(serde_json::json! {
+            {$($tt)*}
+        })
+    };
+}
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Copy, Eq)]
 #[cfg_attr(feature = "server", derive(schemars::JsonSchema))]
 pub struct EmptyObject {}

@@ -67,7 +67,7 @@ pub enum PromptMessageContent {
     /// Image content with base64-encoded data
     Image {
         #[serde(flatten)]
-        image: ImageContent
+        image: ImageContent,
     },
     /// Embedded server-side resource
     Resource { resource: EmbeddedResource },

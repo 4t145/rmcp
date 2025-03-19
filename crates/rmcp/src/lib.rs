@@ -31,3 +31,5 @@ pub use paste::paste;
 pub use schemars;
 #[cfg(feature = "macros")]
 pub use serde;
+#[cfg(feature = "macros")]
+pub use serde_json;
