@@ -22,27 +22,27 @@ futures = "0.3"
 tracing = { version = "0.1" }
 tokio-util = { version = "0.7" }
 pin-project-lite = "0.2"
-paste = { version  = "1", optional = true }
+paste = { version = "1", optional = true }
 
 # for auto generate schema
 schemars = { version = "0.8", optional = true }
 
 # for image encoding
-base64 = {version = "0.21", optional = true }
+base64 = { version = "0.21", optional = true }
 
 # for SSE client
 reqwest = { version = "0.12", default-features = false, features = [
     "json",
     "stream",
     "rustls-tls",
-], optional = true  }
+], optional = true }
 eventsource-client = { version = "0.14.0", optional = true }
+url = { version = "2.4", optional = true }
 
 # For tower compatibility
-tower-service = {version = "0.3", optional = true }
+tower-service = { version = "0.3", optional = true }
 
 rmcp-macros = { version = "0.1", workspace = true, optional = true }
-
 
 
 [features]
@@ -50,10 +50,10 @@ default = ["base64", "macros", "server"]
 client = []
 server = ["transport-io", "dep:schemars"]
 macros = ["dep:rmcp-macros", "dep:paste"]
-transport-sse = ["dep:reqwest", "dep:eventsource-client"]
+transport-sse = ["dep:reqwest", "dep:eventsource-client", "dep:url"]
 transport-io = ["tokio/io-util", "tokio-util/codec"]
 transport-child-process = ["transport-io", "tokio/process"]
-tower = ["dep:tower-service"] 
+tower = ["dep:tower-service"]
 [dev-dependencies]
 tokio = { version = "1", features = ["sync", "macros", "io-util", "rt"] }
 schemars = { version = "0.8" }
