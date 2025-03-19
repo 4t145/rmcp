@@ -34,7 +34,7 @@ For server, the sink item is [`ServerJsonRpcMessage`](crate::model::ServerJsonRp
 4. For tuple of [`tokio::io::AsyncRead`] `R `and [`tokio::io::AsyncWrite`] `W`, type `(R, W)` are automatically implemented [`IntoTransport`] trait
 
 
-```rust
+```rust, ignore
 use tokio::io::{stdin, stdout};
 let transport = (stdin(), stdout());
 ```
@@ -42,7 +42,7 @@ let transport = (stdin(), stdout());
 #### 2. Build a service
 You can easily build a service by using [`ServerHandlerService`](crates/rmcp/src/handler/server.rs) or [`ClientHandlerService`](crates/rmcp/src/handler/client.rs).
 
-```rust
+```rust, ignore
 use rmcp::ServerHandlerService;
 let service = ServerHandlerService::new(common::counter::Counter::new());
 ```
@@ -50,7 +50,7 @@ let service = ServerHandlerService::new(common::counter::Counter::new());
 You can reference the [server examples](examples/servers/src/common/counter.rs).
 
 #### 3. Serve them together
-```rust
+```rust, ignore
 // this call will finish the initialization process
 let server = rmcp::serve_server(service, transport).await?;
 ```
@@ -58,7 +58,7 @@ let server = rmcp::serve_server(service, transport).await?;
 #### 4. Interact with the server
 Once the server is initialized, you can send requests or notifications:
 
-```rust
+```rust, ignore
 // request 
 let roots = server.list_roots().await?;
 
@@ -67,7 +67,7 @@ server.notify_cancelled(...).await?;
 ```
 
 #### 5. Waiting for service shutdown
-```rust
+```rust, ignore
 let quit_reason = server.waiting().await?;
 // or cancel it
 let quit_reason = server.cancel().await?;
@@ -77,8 +77,8 @@ let quit_reason = server.cancel().await?;
 Use `toolbox` and `tool` macros to create tool quickly.
 
 Check this [file](examples/servers/src/common/calculator.rs).
-```rust
-use rmcp::{ServerHandler, model::ServerInfo, schemars, tool, tool_box};
+```rust, ignore
+use rmcp::{ServerHandler, model::ServerInfo, schemars, tool};
 
 use super::counter::Counter;
 
@@ -97,7 +97,7 @@ pub struct Calculator;
 impl Calculator {
     // async function
     #[tool(description = "Calculate the sum of two numbers")]
-    fn async sum(&self, #[tool(aggr)] SumRequest { a, b }: SumRequest) -> String {
+    async fn sum(&self, #[tool(aggr)] SumRequest { a, b }: SumRequest) -> String {
         (a + b).to_string()
     }
 
@@ -134,6 +134,13 @@ The only thing you should do is to make the function's return type implement `In
 And you can just implement `IntoContents`, and the return value will be marked as success automatically. 
 
 If you return a type of `Result<T, E>` where `T` and `E` both implemented `IntoContents`, it's also OK.
+
+### Manage Multi Services
+For many cases you need to manage several service in a collection, you can call `into_dyn` to convert services into the same type.
+```rust, ignore
+let service = service.into_dyn();
+```
+
 
 ### Examples
 See [examples](examples/README.md)

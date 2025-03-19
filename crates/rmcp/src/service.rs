@@ -3,6 +3,7 @@ use crate::model::{
     CancelledNotification, CancelledNotificationParam, JsonRpcMessage, Message, RequestId,
 };
 use crate::transport::IntoTransport;
+use futures::future::BoxFuture;
 use thiserror::Error;
 #[cfg(feature = "client")]
 mod client;
@@ -86,6 +87,103 @@ pub trait Service: Send + Sync + 'static {
     fn set_peer_info(&mut self, peer: <Self::Role as ServiceRole>::PeerInfo);
     fn get_peer_info(&self) -> Option<<Self::Role as ServiceRole>::PeerInfo>;
     fn get_info(&self) -> <Self::Role as ServiceRole>::Info;
+}
+
+pub trait ServiceExt: Service {
+    fn into_dyn(self) -> Box<dyn DynService<Self::Role>>;
+}
+
+impl<S: Service> ServiceExt for S {
+    /// Convert this service to a dynamic boxed service
+    /// 
+    /// This could be very helpful when you want to store the services in a collection
+    fn into_dyn(self) -> Box<dyn DynService<S::Role>> {
+        Box::new(self)
+    }
+}
+
+impl<R: ServiceRole> Service for Box<dyn DynService<R>> {
+    type Role = R;
+
+    fn handle_request(
+        &self,
+        request: <Self::Role as ServiceRole>::PeerReq,
+        context: RequestContext<Self::Role>,
+    ) -> impl Future<Output = Result<<Self::Role as ServiceRole>::Resp, McpError>> + Send + '_ {
+        DynService::handle_request(self.as_ref(), request, context)
+    }
+
+    fn handle_notification(
+        &self,
+        notification: <Self::Role as ServiceRole>::PeerNot,
+    ) -> impl Future<Output = Result<(), McpError>> + Send + '_ {
+        DynService::handle_notification(self.as_ref(), notification)
+    }
+
+    fn get_peer(&self) -> Option<Peer<Self::Role>> {
+        DynService::get_peer(self.as_ref())
+    }
+
+    fn set_peer(&mut self, peer: Peer<Self::Role>) {
+        DynService::set_peer(self.as_mut(), peer)
+    }
+
+    fn set_peer_info(&mut self, peer: <Self::Role as ServiceRole>::PeerInfo) {
+        DynService::set_peer_info(self.as_mut(), peer)
+    }
+
+    fn get_peer_info(&self) -> Option<<Self::Role as ServiceRole>::PeerInfo> {
+        DynService::get_peer_info(self.as_ref())
+    }
+
+    fn get_info(&self) -> <Self::Role as ServiceRole>::Info {
+        DynService::get_info(self.as_ref())
+    }
+}
+
+pub trait DynService<R: ServiceRole>: Send + Sync {
+    fn handle_request(
+        &self,
+        request: R::PeerReq,
+        context: RequestContext<R>,
+    ) -> BoxFuture<Result<R::Resp, McpError>>;
+    fn handle_notification(&self, notification: R::PeerNot) -> BoxFuture<Result<(), McpError>>;
+    fn get_peer(&self) -> Option<Peer<R>>;
+    fn set_peer(&mut self, peer: Peer<R>);
+    fn set_peer_info(&mut self, peer: R::PeerInfo);
+    fn get_peer_info(&self) -> Option<R::PeerInfo>;
+    fn get_info(&self) -> R::Info;
+}
+
+impl<S: Service> DynService<S::Role> for S {
+    fn handle_request(
+        &self,
+        request: <S::Role as ServiceRole>::PeerReq,
+        context: RequestContext<S::Role>,
+    ) -> BoxFuture<Result<<S::Role as ServiceRole>::Resp, McpError>> {
+        Box::pin(self.handle_request(request, context))
+    }
+    fn handle_notification(
+        &self,
+        notification: <S::Role as ServiceRole>::PeerNot,
+    ) -> BoxFuture<Result<(), McpError>> {
+        Box::pin(self.handle_notification(notification))
+    }
+    fn get_peer(&self) -> Option<Peer<S::Role>> {
+        self.get_peer()
+    }
+    fn set_peer(&mut self, peer: Peer<S::Role>) {
+        self.set_peer(peer)
+    }
+    fn set_peer_info(&mut self, peer: <S::Role as ServiceRole>::PeerInfo) {
+        self.set_peer_info(peer)
+    }
+    fn get_peer_info(&self) -> Option<<S::Role as ServiceRole>::PeerInfo> {
+        self.get_peer_info()
+    }
+    fn get_info(&self) -> <S::Role as ServiceRole>::Info {
+        self.get_info()
+    }
 }
 
 use std::collections::HashMap;

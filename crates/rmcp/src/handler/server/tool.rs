@@ -12,7 +12,6 @@ use crate::{
     model::{CallToolRequestParam, CallToolResult, ConstString, IntoContents, JsonObject},
     service::RequestContext,
 };
-pub struct ToolV2 {}
 /// A shortcut for generating a JSON schema for a type.
 pub fn schema_for_type<T: JsonSchema>() -> JsonObject {
     let schema = T::json_schema(&mut schemars::SchemaGenerator::default());
@@ -87,11 +86,6 @@ pub trait FromToolCallContextPart<'a, S>: Sized {
     ) -> Result<(Self, ToolCallContext<'a, S>), crate::Error>;
 }
 
-// impl ToolV2 {
-//     async fn sum(&self, a: i32, b: i32, #[context] ct: CancellationToken, ) {
-
-//     }
-// }
 pub trait IntoCallToolResult {
     fn into_call_tool_result(self) -> Result<CallToolResult, crate::Error>;
 }
