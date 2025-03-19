@@ -122,7 +122,7 @@ impl Sink<ClientJsonRpcMessage> for SseTransport {
         let (tx, rx) = tokio::sync::oneshot::channel();
         tokio::spawn(async move {
             let result = client
-                .post(uri.as_str())
+                .post(uri.as_ref().clone())
                 .json(&item)
                 .send()
                 .await
