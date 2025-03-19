@@ -3,7 +3,7 @@ use eventsource_client::{
     BoxStream, Client as EventSourceClient, ClientBuilder, Error as SseError, SSE,
 };
 use futures::{FutureExt, Sink, Stream, StreamExt};
-use reqwest::{Client as HttpClient, header::HeaderMap};
+use reqwest::{Client as HttpClient, IntoUrl, Url, header::HeaderMap};
 use std::{collections::VecDeque, sync::Arc};
 use thiserror::Error;
 
@@ -17,19 +17,25 @@ pub enum SseTransportError {
     Reqwest(#[from] reqwest::Error),
     #[error("unexpected end of stream")]
     UnexpectedEndOfStream,
+    #[error("Url error: {0}")]
+    Url(#[from] url::ParseError),
 }
 pub struct SseTransport {
     http_client: HttpClient,
     event_source: BoxStream<Result<SSE, SseError>>,
-    post_url: Arc<str>,
-    _sse_url: Arc<str>,
+    post_url: Arc<Url>,
+    _sse_url: Arc<Url>,
     #[allow(clippy::type_complexity)]
     request_queue: VecDeque<tokio::sync::oneshot::Receiver<Result<(), SseTransportError>>>,
 }
 
 impl SseTransport {
-    pub async fn start(url: &str, headers: HeaderMap) -> Result<Self, SseTransportError> {
-        let mut sse_client_builder = ClientBuilder::for_url(url)?;
+    pub async fn start<U>(url: U, headers: HeaderMap) -> Result<Self, SseTransportError>
+    where
+        U: IntoUrl,
+    {
+        let url = url.into_url()?;
+        let mut sse_client_builder = ClientBuilder::for_url(url.as_str())?;
         for (name, value) in &headers {
             if let Ok(value) = std::str::from_utf8(value.as_bytes()) {
                 sse_client_builder = sse_client_builder.header(name.as_str(), value)?;
@@ -49,13 +55,12 @@ impl SseTransport {
                 _ => continue,
             }
         };
-        let post_uri = format!("{}{}", url, first_event.data);
-        let sse_uri = url.to_string();
+        let post_uri = url.join(&first_event.data)?;
         Ok(SseTransport {
             http_client: HttpClient::builder().default_headers(headers).build()?,
             event_source: event_stream,
             post_url: Arc::from(post_uri),
-            _sse_url: Arc::from(sse_uri),
+            _sse_url: Arc::from(url),
             request_queue: Default::default(),
         })
     }
@@ -117,7 +122,7 @@ impl Sink<ClientJsonRpcMessage> for SseTransport {
         let (tx, rx) = tokio::sync::oneshot::channel();
         tokio::spawn(async move {
             let result = client
-                .post(uri.as_ref())
+                .post(uri.as_str())
                 .json(&item)
                 .send()
                 .await
