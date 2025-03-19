@@ -38,10 +38,7 @@ impl ServerHandler for Calculator {
     fn get_info(&self) -> ServerInfo {
         ServerInfo {
             instructions: Some("A simple calculator".into()),
-            capabilities: ServerCapabilities {
-                tools: Some(Default::default()),
-                ..Default::default()
-            },
+            capabilities: ServerCapabilities::builder().enable_tools().build(),
             ..Default::default()
         }
     }

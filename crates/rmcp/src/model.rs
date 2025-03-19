@@ -1,13 +1,17 @@
-use std::{borrow::Cow, collections::BTreeMap, sync::Arc};
+use std::{borrow::Cow, sync::Arc};
 mod annotaded;
+mod capabilities;
 mod content;
 mod prompt;
 mod resource;
 mod tool;
+
 pub use annotaded::*;
+pub use capabilities::*;
 pub use content::*;
 pub use prompt::*;
 pub use resource::*;
+
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 pub use tool::*;
@@ -446,37 +450,7 @@ impl Default for ClientInfo {
     }
 }
 
-pub type ExperimentalCapabilities = BTreeMap<String, JsonObject>;
 
-#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
-#[serde(rename_all = "camelCase")]
-pub struct RootsCapabilities {
-    list_changed: Option<bool>,
-}
-#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Default)]
-pub struct ClientCapabilities {
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub experimental: Option<ExperimentalCapabilities>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub roots: Option<RootsCapabilities>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub sampling: Option<JsonObject>,
-}
-
-#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Default)]
-#[serde(rename_all = "camelCase")]
-pub struct ServerCapabilities {
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub experimental: Option<ExperimentalCapabilities>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub logging: Option<JsonObject>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub prompts: Option<PromptsCapability>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub resources: Option<ResourcesCapability>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub tools: Option<ToolsCapability>,
-}
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 pub struct Implementation {
@@ -499,28 +473,7 @@ impl Implementation {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Default)]
-#[serde(rename_all = "camelCase")]
-pub struct PromptsCapability {
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub list_changed: Option<bool>,
-}
 
-#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Default)]
-#[serde(rename_all = "camelCase")]
-pub struct ResourcesCapability {
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub subscribe: Option<bool>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub list_changed: Option<bool>,
-}
-
-#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Default)]
-#[serde(rename_all = "camelCase")]
-pub struct ToolsCapability {
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub list_changed: Option<bool>,
-}
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Default)]
 #[serde(rename_all = "camelCase")]
