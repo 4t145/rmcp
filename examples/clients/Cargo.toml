@@ -5,7 +5,11 @@ edition = "2024"
 publish = false
 
 [dependencies]
-rmcp= { path = "../../crates/rmcp", features = ["client", "transport-sse", "transport-child-process"] }
+rmcp = { path = "../../crates/rmcp", features = [
+    "client",
+    "transport-sse",
+    "transport-child-process",
+] }
 tokio = { version = "1", features = ["full"] }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
@@ -14,6 +18,11 @@ tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 rand = "0.8"
 futures = "0.3"
 anyhow = "1.0"
+mcp-client = { git = "https://github.com/modelcontextprotocol/rust-sdk.git", branch = "main" }
+
+[[example]]
+name = "official_sdk_adaptor"
+path = "src/official_sdk_adaptor.rs"
 
 [[example]]
 name = "sse"

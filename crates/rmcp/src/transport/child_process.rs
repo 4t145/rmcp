@@ -84,7 +84,7 @@ impl<R: ServiceRole> IntoTransport<R, std::io::Error, ()> for TokioChildProcess 
         impl Sink<TxJsonRpcMessage<R>, Error = std::io::Error> + Send + 'static,
         impl Stream<Item = RxJsonRpcMessage<R>> + Send + 'static,
     ) {
-        IntoTransport::<R, std::io::Error, super::io::TranportAdapterAsyncRW>::into_transport(
+        IntoTransport::<R, std::io::Error, super::io::TransportAdapterAsyncRW>::into_transport(
             self.split(),
         )
     }
