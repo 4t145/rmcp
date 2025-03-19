@@ -35,5 +35,10 @@ name = "std_io"
 path = "src/std_io.rs"
 
 [[example]]
+name = "everything_stdio"
+path = "src/everything_stdio.rs"
+
+[[example]]
 name = "collection"
 path = "src/collection.rs"
+
