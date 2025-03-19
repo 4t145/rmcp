@@ -117,7 +117,7 @@ pub trait ClientHandler: Sized + Send + Sync + 'static {
         &self,
         context: RequestContext<RoleClient>,
     ) -> impl Future<Output = Result<ListRootsResult, McpError>> + Send + '_ {
-        std::future::ready(Err(McpError::method_not_found::<ListRootsRequestMethod>()))
+        std::future::ready(Ok(ListRootsResult::default()))
     }
 
     fn on_cancelled(

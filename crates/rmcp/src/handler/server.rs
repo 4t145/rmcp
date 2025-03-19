@@ -174,25 +174,21 @@ pub trait ServerHandler: Sized + Clone + Send + Sync + 'static {
         request: PaginatedRequestParam,
         context: RequestContext<RoleServer>,
     ) -> impl Future<Output = Result<ListPromptsResult, McpError>> + Send + '_ {
-        std::future::ready(Err(McpError::method_not_found::<ListPromptsRequestMethod>()))
+        std::future::ready(Ok(ListPromptsResult::default()))
     }
     fn list_resources(
         &self,
         request: PaginatedRequestParam,
         context: RequestContext<RoleServer>,
     ) -> impl Future<Output = Result<ListResourcesResult, McpError>> + Send + '_ {
-        std::future::ready(Err(
-            McpError::method_not_found::<ListResourcesRequestMethod>(),
-        ))
+        std::future::ready(Ok(ListResourcesResult::default()))
     }
     fn list_resource_templates(
         &self,
         request: PaginatedRequestParam,
         context: RequestContext<RoleServer>,
     ) -> impl Future<Output = Result<ListResourceTemplatesResult, McpError>> + Send + '_ {
-        std::future::ready(Err(McpError::method_not_found::<
-            ListResourceTemplatesRequestMethod,
-        >()))
+        std::future::ready(Ok(ListResourceTemplatesResult::default()))
     }
     fn read_resource(
         &self,
@@ -229,7 +225,7 @@ pub trait ServerHandler: Sized + Clone + Send + Sync + 'static {
         request: PaginatedRequestParam,
         context: RequestContext<RoleServer>,
     ) -> impl Future<Output = Result<ListToolsResult, McpError>> + Send + '_ {
-        std::future::ready(Err(McpError::method_not_found::<ListToolsRequestMethod>()))
+        std::future::ready(Ok(ListToolsResult::default()))
     }
 
     fn on_cancelled(

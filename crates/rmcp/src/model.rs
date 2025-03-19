@@ -552,7 +552,7 @@ macro_rules! paginated_result {
     ($t:ident {
         $i_item: ident: $t_item: ty
     }) => {
-        #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
+        #[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Default)]
         #[serde(rename_all = "camelCase")]
         pub struct $t {
             #[serde(skip_serializing_if = "Option::is_none")]
@@ -790,7 +790,7 @@ pub struct Root {
 const_string!(ListRootsRequestMethod = "roots/list");
 pub type ListRootsRequest = RequestNoParam<ListRootsRequestMethod>;
 
-#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct ListRootsResult {
     pub roots: Vec<Root>,
