@@ -76,7 +76,7 @@ pub type TxMessage<R> =
     Message<<R as ServiceRole>::Req, <R as ServiceRole>::Resp, <R as ServiceRole>::Not>;
 pub type RxMessage<R> =
     Message<<R as ServiceRole>::PeerReq, <R as ServiceRole>::PeerResp, <R as ServiceRole>::PeerNot>;
-    
+
 pub trait Service: Send + Sync + 'static {
     type Role: ServiceRole;
     fn handle_request(
