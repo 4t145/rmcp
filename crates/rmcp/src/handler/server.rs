@@ -112,19 +112,11 @@ impl<H: ServerHandler> Service for ServerHandlerService<H> {
     }
 
     fn get_peer(&self) -> Option<Peer<Self::Role>> {
-        self.handler.get_peer_sink()
+        self.handler.get_peer()
     }
 
     fn set_peer(&mut self, peer: Peer<Self::Role>) {
-        self.handler.set_peer_sink(peer);
-    }
-
-    fn set_peer_info(&mut self, peer: <Self::Role as ServiceRole>::PeerInfo) {
-        self.handler.set_peer_info(peer);
-    }
-
-    fn get_peer_info(&self) -> Option<<Self::Role as ServiceRole>::PeerInfo> {
-        self.handler.get_peer_info()
+        self.handler.set_peer(peer);
     }
 
     fn get_info(&self) -> <Self::Role as ServiceRole>::Info {
@@ -248,20 +240,12 @@ pub trait ServerHandler: Sized + Clone + Send + Sync + 'static {
         std::future::ready(())
     }
 
-    fn get_peer_sink(&self) -> Option<Peer<RoleServer>> {
+    fn get_peer(&self) -> Option<Peer<RoleServer>> {
         None
     }
 
-    fn set_peer_sink(&mut self, peer: Peer<RoleServer>) {
+    fn set_peer(&mut self, peer: Peer<RoleServer>) {
         drop(peer);
-    }
-
-    fn set_peer_info(&mut self, peer: <RoleServer as ServiceRole>::PeerInfo) {
-        drop(peer);
-    }
-
-    fn get_peer_info(&self) -> Option<<RoleServer as ServiceRole>::PeerInfo> {
-        None
     }
 
     fn get_info(&self) -> ServerInfo {

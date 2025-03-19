@@ -1,6 +1,8 @@
-#[doc = include_str!("../../../README.md")]
-pub mod error;
+#![doc = include_str!("../../../README.md")]
+mod error;
 pub use error::Error;
+
+/// Basic data types in MCP specification
 pub mod model;
 #[cfg(any(feature = "client", feature = "server"))]
 pub mod service;

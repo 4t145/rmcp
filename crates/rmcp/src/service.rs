@@ -13,8 +13,8 @@ pub use client::*;
 mod server;
 #[cfg(feature = "server")]
 pub use server::*;
-use tokio_util::sync::CancellationToken;
 
+use tokio_util::sync::CancellationToken;
 #[derive(Error, Debug)]
 #[non_exhaustive]
 pub enum ServiceError {
@@ -48,7 +48,7 @@ impl<T> TransferObject for T where
 }
 
 #[allow(private_bounds, reason = "there's no the third implementation")]
-pub trait ServiceRole: std::fmt::Debug + Send + Sync + 'static + Copy {
+pub trait ServiceRole: std::fmt::Debug + Send + Sync + 'static + Copy + Clone {
     type Req: TransferObject;
     type Resp: TransferObject;
     type Not: TryInto<CancelledNotification, Error = Self::Not>
@@ -64,13 +64,19 @@ pub trait ServiceRole: std::fmt::Debug + Send + Sync + 'static + Copy {
     type PeerInfo: TransferObject;
 }
 
-pub(crate) type TxJsonRpcMessage<R> =
+pub type TxJsonRpcMessage<R> =
     JsonRpcMessage<<R as ServiceRole>::Req, <R as ServiceRole>::Resp, <R as ServiceRole>::Not>;
-pub(crate) type RxJsonRpcMessage<R> = JsonRpcMessage<
+pub type RxJsonRpcMessage<R> = JsonRpcMessage<
     <R as ServiceRole>::PeerReq,
     <R as ServiceRole>::PeerResp,
     <R as ServiceRole>::PeerNot,
 >;
+
+pub type TxMessage<R> =
+    Message<<R as ServiceRole>::Req, <R as ServiceRole>::Resp, <R as ServiceRole>::Not>;
+pub type RxMessage<R> =
+    Message<<R as ServiceRole>::PeerReq, <R as ServiceRole>::PeerResp, <R as ServiceRole>::PeerNot>;
+    
 pub trait Service: Send + Sync + 'static {
     type Role: ServiceRole;
     fn handle_request(
@@ -84,8 +90,6 @@ pub trait Service: Send + Sync + 'static {
     ) -> impl Future<Output = Result<(), McpError>> + Send + '_;
     fn get_peer(&self) -> Option<Peer<Self::Role>>;
     fn set_peer(&mut self, peer: Peer<Self::Role>);
-    fn set_peer_info(&mut self, peer: <Self::Role as ServiceRole>::PeerInfo);
-    fn get_peer_info(&self) -> Option<<Self::Role as ServiceRole>::PeerInfo>;
     fn get_info(&self) -> <Self::Role as ServiceRole>::Info;
 }
 
@@ -95,7 +99,7 @@ pub trait ServiceExt: Service {
 
 impl<S: Service> ServiceExt for S {
     /// Convert this service to a dynamic boxed service
-    /// 
+    ///
     /// This could be very helpful when you want to store the services in a collection
     fn into_dyn(self) -> Box<dyn DynService<S::Role>> {
         Box::new(self)
@@ -128,14 +132,6 @@ impl<R: ServiceRole> Service for Box<dyn DynService<R>> {
         DynService::set_peer(self.as_mut(), peer)
     }
 
-    fn set_peer_info(&mut self, peer: <Self::Role as ServiceRole>::PeerInfo) {
-        DynService::set_peer_info(self.as_mut(), peer)
-    }
-
-    fn get_peer_info(&self) -> Option<<Self::Role as ServiceRole>::PeerInfo> {
-        DynService::get_peer_info(self.as_ref())
-    }
-
     fn get_info(&self) -> <Self::Role as ServiceRole>::Info {
         DynService::get_info(self.as_ref())
     }
@@ -150,8 +146,6 @@ pub trait DynService<R: ServiceRole>: Send + Sync {
     fn handle_notification(&self, notification: R::PeerNot) -> BoxFuture<Result<(), McpError>>;
     fn get_peer(&self) -> Option<Peer<R>>;
     fn set_peer(&mut self, peer: Peer<R>);
-    fn set_peer_info(&mut self, peer: R::PeerInfo);
-    fn get_peer_info(&self) -> Option<R::PeerInfo>;
     fn get_info(&self) -> R::Info;
 }
 
@@ -174,12 +168,6 @@ impl<S: Service> DynService<S::Role> for S {
     }
     fn set_peer(&mut self, peer: Peer<S::Role>) {
         self.set_peer(peer)
-    }
-    fn set_peer_info(&mut self, peer: <S::Role as ServiceRole>::PeerInfo) {
-        self.set_peer_info(peer)
-    }
-    fn get_peer_info(&self) -> Option<<S::Role as ServiceRole>::PeerInfo> {
-        self.get_peer_info()
     }
     fn get_info(&self) -> <S::Role as ServiceRole>::Info {
         self.get_info()
