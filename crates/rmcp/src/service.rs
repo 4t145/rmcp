@@ -1,5 +1,7 @@
 use crate::error::Error as McpError;
-use crate::model::{CancelledNotification, JsonRpcMessage, Message, RequestId};
+use crate::model::{
+    CancelledNotification, CancelledNotificationParam, JsonRpcMessage, Message, RequestId,
+};
 use crate::transport::IntoTransport;
 use thiserror::Error;
 #[cfg(feature = "client")]
@@ -23,6 +25,8 @@ pub enum ServiceError {
     UnexpectedResponse,
     #[error("task cancelled for reason {}", reason.as_deref().unwrap_or("<unknown>"))]
     Cancelled { reason: Option<String> },
+    #[error("request timeout after {}", chrono::Duration::from_std(*timeout).unwrap_or_default())]
+    Timeout { timeout: Duration },
 }
 
 impl ServiceError {}
@@ -88,6 +92,7 @@ use std::collections::HashMap;
 use std::ops::Deref;
 use std::sync::Arc;
 use std::sync::atomic::AtomicU32;
+use std::time::Duration;
 
 use tokio::sync::mpsc;
 
@@ -110,20 +115,61 @@ type Responder<T> = tokio::sync::oneshot::Sender<T>;
 
 /// A handle to a remote request
 ///
-/// You can cancel it by call [`Peer::send_notification`] with [`CancelledNotification`]
+/// You can cancel it by call [`RequestHandle::cancel`] with a reason,
 ///
 /// or wait for response by call [`RequestHandle::await_response`]
 #[derive(Debug)]
 pub struct RequestHandle<R: ServiceRole> {
-    rx: tokio::sync::oneshot::Receiver<Result<R::PeerResp, ServiceError>>,
+    pub rx: tokio::sync::oneshot::Receiver<Result<R::PeerResp, ServiceError>>,
+    pub options: PeerRequestOptions,
+    pub peer: Peer<R>,
     pub id: RequestId,
 }
 
 impl<R: ServiceRole> RequestHandle<R> {
+    pub const REQUEST_TIMEOUT_REASON: &str = "request timeout";
     pub async fn await_response(self) -> Result<R::PeerResp, ServiceError> {
-        self.rx
-            .await
-            .map_err(|_e| ServiceError::Transport(std::io::Error::other("disconnected")))?
+        if let Some(timeout) = self.options.timeout {
+            let timeout_result = tokio::time::timeout(timeout, async move {
+                self.rx
+                    .await
+                    .map_err(|_e| ServiceError::Transport(std::io::Error::other("disconnected")))?
+            })
+            .await;
+            match timeout_result {
+                Ok(response) => response,
+                Err(_) => {
+                    let error = Err(ServiceError::Timeout { timeout });
+                    // cancel this request
+                    let notification = CancelledNotification {
+                        params: CancelledNotificationParam {
+                            request_id: self.id,
+                            reason: Some(Self::REQUEST_TIMEOUT_REASON.to_owned()),
+                        },
+                        method: crate::model::CancelledNotificationMethod,
+                    };
+                    let _ = self.peer.send_notification(notification.into()).await;
+                    error
+                }
+            }
+        } else {
+            self.rx
+                .await
+                .map_err(|_e| ServiceError::Transport(std::io::Error::other("disconnected")))?
+        }
+    }
+
+    /// Cancel this request
+    pub async fn cancel(self, reason: Option<String>) -> Result<(), ServiceError> {
+        let notification = CancelledNotification {
+            params: CancelledNotificationParam {
+                request_id: self.id,
+                reason,
+            },
+            method: crate::model::CancelledNotificationMethod,
+        };
+        self.peer.send_notification(notification.into()).await?;
+        Ok(())
     }
 }
 
@@ -146,7 +192,7 @@ pub enum PeerSinkMessage<R: ServiceRole> {
 pub struct Peer<R: ServiceRole> {
     tx: mpsc::Sender<PeerSinkMessage<R>>,
     request_id_provider: Arc<dyn RequestIdProvider>,
-    info: R::PeerInfo,
+    info: Arc<R::PeerInfo>,
 }
 
 impl<R: ServiceRole> std::fmt::Debug for Peer<R> {
@@ -159,6 +205,18 @@ impl<R: ServiceRole> std::fmt::Debug for Peer<R> {
 }
 
 type ProxyOutbound<R> = mpsc::Receiver<PeerSinkMessage<R>>;
+
+#[derive(Debug, Default)]
+pub struct PeerRequestOptions {
+    timeout: Option<Duration>,
+}
+
+impl PeerRequestOptions {
+    pub fn no_options() -> Self {
+        Self::default()
+    }
+}
+
 impl<R: ServiceRole> Peer<R> {
     const CLIENT_CHANNEL_BUFFER_SIZE: usize = 1024;
     pub fn new(
@@ -170,7 +228,7 @@ impl<R: ServiceRole> Peer<R> {
             Self {
                 tx,
                 request_id_provider,
-                info: peer_info,
+                info: peer_info.into(),
             },
             rx,
         )
@@ -186,7 +244,7 @@ impl<R: ServiceRole> Peer<R> {
             .map_err(|_e| ServiceError::Transport(std::io::Error::other("disconnected")))?
     }
     pub async fn send_request(&self, request: R::Req) -> Result<R::PeerResp, ServiceError> {
-        self.send_cancellable_request(request)
+        self.send_cancellable_request(request, PeerRequestOptions::no_options())
             .await?
             .await_response()
             .await
@@ -194,6 +252,7 @@ impl<R: ServiceRole> Peer<R> {
     pub async fn send_cancellable_request(
         &self,
         request: R::Req,
+        options: PeerRequestOptions,
     ) -> Result<RequestHandle<R>, ServiceError> {
         let id = self.request_id_provider.next_request_id();
         let (responder, receiver) = tokio::sync::oneshot::channel();
@@ -201,7 +260,12 @@ impl<R: ServiceRole> Peer<R> {
             .send(PeerSinkMessage::Request(request, id.clone(), responder))
             .await
             .map_err(|_m| ServiceError::Transport(std::io::Error::other("disconnected")))?;
-        Ok(RequestHandle { id, rx: receiver })
+        Ok(RequestHandle {
+            id,
+            rx: receiver,
+            options,
+            peer: self.clone(),
+        })
     }
     pub fn peer_info(&self) -> &R::PeerInfo {
         &self.info

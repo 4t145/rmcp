@@ -450,8 +450,6 @@ impl Default for ClientInfo {
     }
 }
 
-
-
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 pub struct Implementation {
     pub name: String,
@@ -472,8 +470,6 @@ impl Implementation {
         }
     }
 }
-
-
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Default)]
 #[serde(rename_all = "camelCase")]
