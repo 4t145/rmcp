@@ -28,7 +28,7 @@ pub struct TokioChildProcess {
     child_stdout: ChildStdout,
 }
 
-// we hold the child process with stdout, for it's easier to read implement
+// we hold the child process with stdout, for it's easier to implement AsyncRead
 pin_project_lite::pin_project! {
     pub struct TokioChildProcessOut {
         child: tokio::process::Child,
@@ -84,7 +84,7 @@ impl<R: ServiceRole> IntoTransport<R, std::io::Error, ()> for TokioChildProcess 
         impl Sink<TxJsonRpcMessage<R>, Error = std::io::Error> + Send + 'static,
         impl Stream<Item = RxJsonRpcMessage<R>> + Send + 'static,
     ) {
-        IntoTransport::<R, std::io::Error, super::io::TranportAdapterAsyncRW>::into_transport(
+        IntoTransport::<R, std::io::Error, super::io::TransportAdapterAsyncRW>::into_transport(
             self.split(),
         )
     }

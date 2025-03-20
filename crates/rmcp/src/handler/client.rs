@@ -82,14 +82,6 @@ impl<H: ClientHandler> Service for ClientHandlerService<H> {
         self.handler.set_peer(peer);
     }
 
-    fn set_peer_info(&mut self, peer: <Self::Role as ServiceRole>::PeerInfo) {
-        self.handler.set_peer_info(peer);
-    }
-
-    fn get_peer_info(&self) -> Option<<Self::Role as ServiceRole>::PeerInfo> {
-        self.handler.get_peer_info()
-    }
-
     fn get_info(&self) -> <Self::Role as ServiceRole>::Info {
         self.handler.get_info()
     }
@@ -117,7 +109,7 @@ pub trait ClientHandler: Sized + Send + Sync + 'static {
         &self,
         context: RequestContext<RoleClient>,
     ) -> impl Future<Output = Result<ListRootsResult, McpError>> + Send + '_ {
-        std::future::ready(Err(McpError::method_not_found::<ListRootsRequestMethod>()))
+        std::future::ready(Ok(ListRootsResult::default()))
     }
 
     fn on_cancelled(
@@ -157,14 +149,6 @@ pub trait ClientHandler: Sized + Send + Sync + 'static {
     fn get_peer(&self) -> Option<Peer<RoleClient>>;
 
     fn set_peer(&mut self, peer: Peer<RoleClient>);
-
-    fn set_peer_info(&mut self, peer: ServerInfo) {
-        drop(peer);
-    }
-
-    fn get_peer_info(&self) -> Option<ServerInfo> {
-        None
-    }
 
     fn get_info(&self) -> ClientInfo {
         ClientInfo::default()

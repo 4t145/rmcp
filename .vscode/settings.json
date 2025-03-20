@@ -8,5 +8,8 @@
         "schemars",
         "thiserror",
         "Wasi"
+    ],
+    "rust-analyzer.cargo.features": [
+        "tower"
     ]
 }

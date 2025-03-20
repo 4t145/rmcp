@@ -28,7 +28,7 @@ impl ServiceRole for RoleServer {
 
 pub type ClientSink = Peer<RoleServer>;
 
-pub async fn serve_server<S, T, E, A>(mut service: S, transport: T) -> Result<RunningService<S>, E>
+pub async fn serve_server<S, T, E, A>(service: S, transport: T) -> Result<RunningService<S>, E>
 where
     S: Service<Role = RoleServer>,
     T: IntoTransport<RoleServer, E, A>,
@@ -87,7 +87,6 @@ where
         )
         .into());
     };
-    service.set_peer_info(peer_info.params.clone());
     serve_inner(service, (sink, stream), peer_info.params, id_provider).await
 }
 
