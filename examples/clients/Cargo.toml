@@ -19,8 +19,7 @@ tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 rand = "0.8"
 futures = "0.3"
 anyhow = "1.0"
-mcp-client = { git = "https://github.com/modelcontextprotocol/rust-sdk.git", branch = "main" }
-mcp-core = { git = "https://github.com/modelcontextprotocol/rust-sdk.git", branch = "main" }
+
 tower = "0.5"
 
 [[example]]

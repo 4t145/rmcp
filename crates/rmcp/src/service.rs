@@ -439,15 +439,14 @@ where
 {
     use futures::{SinkExt, StreamExt};
     const SINK_PROXY_BUFFER_SIZE: usize = 64;
-    tracing::info!("Server started");
     let (sink_proxy_tx, mut sink_proxy_rx) = tokio::sync::mpsc::channel::<
         Message<<R as ServiceRole>::Req, <R as ServiceRole>::Resp, <R as ServiceRole>::Not>,
     >(SINK_PROXY_BUFFER_SIZE);
 
     if R::IS_CLIENT {
-        tracing::info!(?peer_info, "Server initialized as client");
+        tracing::info!(?peer_info, "Service initialized as client");
     } else {
-        tracing::info!(?peer_info, "Server initialized as server");
+        tracing::info!(?peer_info, "Service initialized as server");
     }
 
     let (peer, mut peer_proxy) = <Peer<R>>::new(id_provider, peer_info);

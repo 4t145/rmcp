@@ -1,4 +1,5 @@
 use anyhow::Result;
+use rmcp::model::{ClientCapabilities, ClientInfo, Implementation};
 use rmcp::{ServiceExt, model::CallToolRequestParam, transport::sse::SseTransport};
 
 use tracing_subscriber::layer::SubscriberExt;
@@ -15,8 +16,15 @@ async fn main() -> Result<()> {
         .with(tracing_subscriber::fmt::layer())
         .init();
     let transport = SseTransport::start("http://localhost:8000/sse", Default::default()).await?;
-
-    let client = None.serve(transport).await.inspect_err(|e| {
+    let client_info = ClientInfo {
+        protocol_version: Default::default(),
+        capabilities: ClientCapabilities::default(),
+        client_info: Implementation {
+            name: "test sse client".to_string(),
+            version: "0.0.1".to_string(),
+        },
+    };
+    let client = client_info.serve(transport).await.inspect_err(|e| {
         tracing::error!("client error: {:?}", e);
     })?;
 

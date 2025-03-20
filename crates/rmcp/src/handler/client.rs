@@ -132,7 +132,7 @@ pub trait ClientHandler: Sized + Send + Sync + 'static {
     }
 }
 
-/// I will call it the "Default" client implementation.
+/// Do nothing, just store the peer.
 impl ClientHandler for Option<Peer<RoleClient>> {
     fn get_peer(&self) -> Option<Peer<RoleClient>> {
         self.clone()
@@ -143,7 +143,7 @@ impl ClientHandler for Option<Peer<RoleClient>> {
     }
 }
 
-/// I will call it the "Default" client implementation.
+/// Do nothing, even store the peer.
 impl ClientHandler for () {
     fn get_peer(&self) -> Option<Peer<RoleClient>> {
         None
@@ -151,5 +151,20 @@ impl ClientHandler for () {
 
     fn set_peer(&mut self, peer: Peer<RoleClient>) {
         drop(peer);
+    }
+}
+
+/// Do nothing, even store the peer.
+impl ClientHandler for ClientInfo {
+    fn get_peer(&self) -> Option<Peer<RoleClient>> {
+        None
+    }
+
+    fn set_peer(&mut self, peer: Peer<RoleClient>) {
+        drop(peer);
+    }
+
+    fn get_info(&self) -> ClientInfo {
+        self.clone()
     }
 }
