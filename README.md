@@ -13,13 +13,14 @@ All the features listed on specification would be implemented in this crate. And
 
 ## Usage
 
-### Import from github
+### Import
 ```toml
 rmcp = { version = "0.1", features = ["server"] }
+## or dev channel
+rmcp = { git = "https://github.com/4t145/rmcp", branch = "dev" }
 ```
 
 ### Quick start
-update readme
 Start a client in one line:
 ```rust
 use rmcp::{ServiceExt, transport::child_process::TokioChildProcess};

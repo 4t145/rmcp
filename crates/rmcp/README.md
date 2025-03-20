@@ -13,7 +13,7 @@ All the features listed on specification would be implemented in this crate. And
 
 ## Usage
 
-### Import from github
+### Import
 ```toml
 rmcp = { version = "0.1", features = ["server"] }
 ```
