@@ -99,10 +99,11 @@ async fn main() -> Result<()> {
         .await?;
     tracing::info!("Prompt - complex: {prompt:#?}");
 
-    // // List resource templates
-    // // TODO: This works in MCP Inspector but not here. I think typescript-sdk needs to be updated in everything mcp server
-    // let resource_templates = service.list_resource_templates(PaginatedRequestParam { cursor: None }).await?;
-    // tracing::info!("Available resource templates: {resource_templates:#?}");
+    // List resource templates
+    let resource_templates = service
+        .list_resource_templates(PaginatedRequestParam { cursor: None })
+        .await?;
+    tracing::info!("Available resource templates: {resource_templates:#?}");
 
     service.cancel().await?;
 

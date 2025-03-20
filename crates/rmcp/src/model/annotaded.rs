@@ -1,6 +1,9 @@
 use std::ops::{Deref, DerefMut};
 
-use super::{RawContent, RawEmbeddedResource, RawImageContent, RawResource, RawTextContent, Role};
+use super::{
+    RawContent, RawEmbeddedResource, RawImageContent, RawResource, RawResourceTemplate,
+    RawTextContent, Role,
+};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 
@@ -160,6 +163,7 @@ annotate!(RawTextContent);
 annotate!(RawImageContent);
 annotate!(RawEmbeddedResource);
 annotate!(RawResource);
+annotate!(RawResourceTemplate);
 
 pub trait AnnotateAble: sealed::Sealed {
     fn optional_annotate(self, annotations: Option<Annotations>) -> Annotated<Self>
