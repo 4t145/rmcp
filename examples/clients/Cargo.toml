@@ -22,9 +22,6 @@ anyhow = "1.0"
 mcp-client = { git = "https://github.com/modelcontextprotocol/rust-sdk.git", branch = "main" }
 mcp-core = { git = "https://github.com/modelcontextprotocol/rust-sdk.git", branch = "main" }
 tower = "0.5"
-[[example]]
-name = "official_sdk_adaptor"
-path = "src/official_sdk_adaptor.rs"
 
 [[example]]
 name = "sse"
