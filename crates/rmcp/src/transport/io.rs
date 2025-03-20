@@ -32,8 +32,8 @@ where
     }
 }
 
-pub enum TranportAdapterAsyncCombinedRW {}
-impl<Role, S> IntoTransport<Role, std::io::Error, TranportAdapterAsyncCombinedRW> for S
+pub enum TransportAdapterAsyncCombinedRW {}
+impl<Role, S> IntoTransport<Role, std::io::Error, TransportAdapterAsyncCombinedRW> for S
 where
     Role: ServiceRole,
     S: AsyncRead + AsyncWrite + Send + 'static,

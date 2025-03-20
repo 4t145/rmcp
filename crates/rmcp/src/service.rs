@@ -13,6 +13,9 @@ pub use client::*;
 mod server;
 #[cfg(feature = "server")]
 pub use server::*;
+#[cfg(feature = "tower")]
+mod tower;
+pub use tower::*;
 
 use tokio_util::sync::CancellationToken;
 #[derive(Error, Debug)]

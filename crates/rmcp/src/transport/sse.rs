@@ -4,7 +4,7 @@ use eventsource_client::{
 };
 use futures::{FutureExt, Sink, Stream, StreamExt};
 use reqwest::{Client as HttpClient, IntoUrl, Url, header::HeaderMap};
-use std::{collections::VecDeque, sync::Arc};
+use std::{collections::VecDeque, sync::Arc, time::Duration};
 use thiserror::Error;
 
 #[derive(Error, Debug)]
@@ -25,12 +25,17 @@ pub struct SseTransport {
     event_source: BoxStream<Result<SSE, SseError>>,
     post_url: Arc<Url>,
     _sse_url: Arc<Url>,
+    timeout: Option<Duration>,
     #[allow(clippy::type_complexity)]
     request_queue: VecDeque<tokio::sync::oneshot::Receiver<Result<(), SseTransportError>>>,
 }
 
 impl SseTransport {
-    pub async fn start<U>(url: U, headers: HeaderMap) -> Result<Self, SseTransportError>
+    pub async fn start_with_timeout<U>(
+        url: U,
+        headers: HeaderMap,
+        timeout: Option<Duration>,
+    ) -> Result<Self, SseTransportError>
     where
         U: IntoUrl,
     {
@@ -40,6 +45,9 @@ impl SseTransport {
             if let Ok(value) = std::str::from_utf8(value.as_bytes()) {
                 sse_client_builder = sse_client_builder.header(name.as_str(), value)?;
             }
+        }
+        if let Some(timeout) = timeout {
+            sse_client_builder = sse_client_builder.read_timeout(timeout);
         }
         let client = sse_client_builder.build();
         let mut event_stream = client.stream();
@@ -61,8 +69,15 @@ impl SseTransport {
             event_source: event_stream,
             post_url: Arc::from(post_uri),
             _sse_url: Arc::from(url),
+            timeout,
             request_queue: Default::default(),
         })
+    }
+    pub async fn start<U>(url: U, headers: HeaderMap) -> Result<Self, SseTransportError>
+    where
+        U: IntoUrl,
+    {
+        Self::start_with_timeout(url, headers, None).await
     }
 }
 
@@ -120,10 +135,12 @@ impl Sink<ClientJsonRpcMessage> for SseTransport {
         let client = self.http_client.clone();
         let uri = self.post_url.clone();
         let (tx, rx) = tokio::sync::oneshot::channel();
+        let mut request_builder = client.post(uri.as_ref().clone()).json(&item);
+        if let Some(timeout) = self.timeout.as_ref() {
+            request_builder = request_builder.timeout(*timeout);
+        }
         tokio::spawn(async move {
-            let result = client
-                .post(uri.as_ref().clone())
-                .json(&item)
+            let result = request_builder
                 .send()
                 .await
                 .and_then(|resp| resp.error_for_status())
