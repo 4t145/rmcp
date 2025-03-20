@@ -15,6 +15,7 @@ mod server;
 pub use server::*;
 #[cfg(feature = "tower")]
 mod tower;
+#[cfg(feature = "tower")]
 pub use tower::*;
 
 use tokio_util::sync::CancellationToken;
