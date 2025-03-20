@@ -1,7 +1,5 @@
 use anyhow::Result;
-use rmcp::{
-    ClientHandlerService, model::CallToolRequestParam, serve_client, transport::sse::SseTransport,
-};
+use rmcp::{ServiceExt, model::CallToolRequestParam, transport::sse::SseTransport};
 
 use tracing_subscriber::layer::SubscriberExt;
 use tracing_subscriber::util::SubscriberInitExt;
@@ -18,11 +16,9 @@ async fn main() -> Result<()> {
         .init();
     let transport = SseTransport::start("http://localhost:8000/sse", Default::default()).await?;
 
-    let client = serve_client(ClientHandlerService::simple(), transport)
-        .await
-        .inspect_err(|e| {
-            tracing::error!("client error: {:?}", e);
-        })?;
+    let client = None.serve(transport).await.inspect_err(|e| {
+        tracing::error!("client error: {:?}", e);
+    })?;
 
     // Initialize
     let server_info = client.peer_info();

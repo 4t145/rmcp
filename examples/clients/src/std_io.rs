@@ -1,7 +1,6 @@
 use anyhow::Result;
 use rmcp::{
-    ClientHandlerService, model::CallToolRequestParam, serve_client,
-    transport::child_process::TokioChildProcess,
+    model::CallToolRequestParam, service::ServiceExt, transport::child_process::TokioChildProcess,
 };
 
 use tokio::process::Command;
@@ -18,11 +17,18 @@ async fn main() -> Result<()> {
         )
         .with(tracing_subscriber::fmt::layer())
         .init();
-    let service = serve_client(
-        ClientHandlerService::simple(),
-        TokioChildProcess::new(Command::new("uvx").arg("mcp-server-git"))?,
-    )
-    .await?;
+    let service = ()
+        .serve(TokioChildProcess::new(
+            Command::new("uvx").arg("mcp-server-git"),
+        )?)
+        .await?;
+
+    // or
+    // serve_client(
+    //     (),
+    //     TokioChildProcess::new(Command::new("uvx").arg("mcp-server-git"))?,
+    // )
+    // .await?;
 
     // Initialize
     let server_info = service.peer_info();

@@ -19,6 +19,16 @@ rmcp = { version = "0.1", features = ["server"] }
 ```
 
 ### Quick start
+update readme
+Start a client in one line:
+```rust
+use rmcp::{ServiceExt, transport::child_process::TokioChildProcess};
+use tokio::process::Command;
+
+let client = ().serve(
+    TokioChildProcess::new(Command::new("npx").arg("-y").arg("@modelcontextprotocol/server-everything"))?
+).await?;
+```
 
 #### 1. Build a transport
 The transport type must implemented [`IntoTransport`](crate::transport::IntoTransport) trait, which allow split into a sink and a stream.
@@ -40,11 +50,10 @@ let transport = (stdin(), stdout());
 ```
 
 #### 2. Build a service
-You can easily build a service by using [`ServerHandlerService`](crates/rmcp/src/handler/server.rs) or [`ClientHandlerService`](crates/rmcp/src/handler/client.rs).
+You can easily build a service by using [`ServerHandler`](crates/rmcp/src/handler/server.rs) or [`ClientHandler`](crates/rmcp/src/handler/client.rs).
 
 ```rust, ignore
-use rmcp::ServerHandlerService;
-let service = ServerHandlerService::new(common::counter::Counter::new());
+let service = common::counter::Counter::new();
 ```
 
 Or if you want to use `tower`, you can [`TowerHandler`] as a adapter.
@@ -54,7 +63,7 @@ You can reference the [server examples](examples/servers/src/common/counter.rs).
 #### 3. Serve them together
 ```rust, ignore
 // this call will finish the initialization process
-let server = rmcp::serve_server(service, transport).await?;
+let server = service.serve(transport).await?;
 ```
 
 #### 4. Interact with the server

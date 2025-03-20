@@ -1,11 +1,11 @@
 use anyhow::Result;
 use rmcp::{
-    ClientHandlerService,
+    ServiceExt,
     model::{
         CallToolRequestParam, GetPromptRequestParam, PaginatedRequestParam,
         ReadResourceRequestParam,
     },
-    object, serve_client,
+    object,
     transport::child_process::TokioChildProcess,
 };
 
@@ -25,15 +25,13 @@ async fn main() -> Result<()> {
         .init();
 
     // Start server
-    let service = serve_client(
-        ClientHandlerService::simple(),
-        TokioChildProcess::new(
+    let service = ()
+        .serve(TokioChildProcess::new(
             Command::new("npx")
                 .arg("-y")
                 .arg("@modelcontextprotocol/server-everything"),
-        )?,
-    )
-    .await?;
+        )?)
+        .await?;
 
     // Initialize
     let server_info = service.peer_info();

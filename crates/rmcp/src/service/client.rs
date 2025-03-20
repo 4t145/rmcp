@@ -33,9 +33,26 @@ impl ServiceRole for RoleClient {
 
 pub type ServerSink = Peer<RoleClient>;
 
-pub async fn serve_client<S, T, E, A>(service: S, transport: T) -> Result<RunningService<S>, E>
+impl<S: Service<RoleClient>> ServiceExt<RoleClient> for S {
+    fn serve<T, E, A>(
+        self,
+        transport: T,
+    ) -> impl Future<Output = Result<RunningService<RoleClient, Self>, E>> + Send
+    where
+        T: IntoTransport<RoleClient, E, A>,
+        E: std::error::Error + From<std::io::Error> + Send + Sync + 'static,
+        Self: Sized,
+    {
+        serve_client(self, transport)
+    }
+}
+
+pub async fn serve_client<S, T, E, A>(
+    service: S,
+    transport: T,
+) -> Result<RunningService<RoleClient, S>, E>
 where
-    S: Service<Role = RoleClient>,
+    S: Service<RoleClient>,
     T: IntoTransport<RoleClient, E, A>,
     E: std::error::Error + From<std::io::Error> + Send + Sync + 'static,
 {
