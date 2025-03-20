@@ -1,18 +1,43 @@
-use std::{borrow::Cow, collections::BTreeMap, sync::Arc};
+use std::{borrow::Cow, sync::Arc};
 mod annotaded;
+mod capabilities;
 mod content;
 mod prompt;
 mod resource;
 mod tool;
+
 pub use annotaded::*;
+pub use capabilities::*;
 pub use content::*;
 pub use prompt::*;
 pub use resource::*;
+
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 pub use tool::*;
 pub type JsonObject<F = Value> = serde_json::Map<String, F>;
 
+/// unwrap the JsonObject under [`serde_json::Value`]
+///
+/// # Panic
+/// This will panic when the value is not a object in debug mode.
+pub fn object(value: serde_json::Value) -> JsonObject {
+    debug_assert!(value.is_object());
+    match value {
+        serde_json::Value::Object(map) => map,
+        _ => JsonObject::default(),
+    }
+}
+
+#[cfg(feature = "macros")]
+#[macro_export]
+macro_rules! object {
+    ({$($tt:tt)*}) => {
+        $crate::model::object(serde_json::json! {
+            {$($tt)*}
+        })
+    };
+}
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Copy, Eq)]
 #[cfg_attr(feature = "server", derive(schemars::JsonSchema))]
 pub struct EmptyObject {}
@@ -446,38 +471,6 @@ impl Default for ClientInfo {
     }
 }
 
-pub type ExperimentalCapabilities = BTreeMap<String, JsonObject>;
-
-#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
-#[serde(rename_all = "camelCase")]
-pub struct RootsCapabilities {
-    list_changed: Option<bool>,
-}
-#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Default)]
-pub struct ClientCapabilities {
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub experimental: Option<ExperimentalCapabilities>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub roots: Option<RootsCapabilities>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub sampling: Option<JsonObject>,
-}
-
-#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Default)]
-#[serde(rename_all = "camelCase")]
-pub struct ServerCapabilities {
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub experimental: Option<ExperimentalCapabilities>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub logging: Option<JsonObject>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub prompts: Option<PromptsCapability>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub resources: Option<ResourcesCapability>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub tools: Option<ToolsCapability>,
-}
-
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 pub struct Implementation {
     pub name: String,
@@ -497,29 +490,6 @@ impl Implementation {
             version: env!("CARGO_PKG_VERSION").to_owned(),
         }
     }
-}
-
-#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Default)]
-#[serde(rename_all = "camelCase")]
-pub struct PromptsCapability {
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub list_changed: Option<bool>,
-}
-
-#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Default)]
-#[serde(rename_all = "camelCase")]
-pub struct ResourcesCapability {
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub subscribe: Option<bool>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub list_changed: Option<bool>,
-}
-
-#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Default)]
-#[serde(rename_all = "camelCase")]
-pub struct ToolsCapability {
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub list_changed: Option<bool>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Default)]
@@ -552,7 +522,7 @@ macro_rules! paginated_result {
     ($t:ident {
         $i_item: ident: $t_item: ty
     }) => {
-        #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
+        #[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Default)]
         #[serde(rename_all = "camelCase")]
         pub struct $t {
             #[serde(skip_serializing_if = "Option::is_none")]
@@ -790,7 +760,7 @@ pub struct Root {
 const_string!(ListRootsRequestMethod = "roots/list");
 pub type ListRootsRequest = RequestNoParam<ListRootsRequestMethod>;
 
-#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct ListRootsResult {
     pub roots: Vec<Root>,

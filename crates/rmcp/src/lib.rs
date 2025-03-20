@@ -1,5 +1,8 @@
-pub mod error;
+#![doc = include_str!("../../../README.md")]
+mod error;
 pub use error::Error;
+
+/// Basic data types in MCP specification
 pub mod model;
 #[cfg(any(feature = "client", feature = "server"))]
 pub mod service;
@@ -28,3 +31,5 @@ pub use paste::paste;
 pub use schemars;
 #[cfg(feature = "macros")]
 pub use serde;
+#[cfg(feature = "macros")]
+pub use serde_json;

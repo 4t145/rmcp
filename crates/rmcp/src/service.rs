@@ -1,6 +1,9 @@
 use crate::error::Error as McpError;
-use crate::model::{CancelledNotification, JsonRpcMessage, Message, RequestId};
+use crate::model::{
+    CancelledNotification, CancelledNotificationParam, JsonRpcMessage, Message, RequestId,
+};
 use crate::transport::IntoTransport;
+use futures::future::BoxFuture;
 use thiserror::Error;
 #[cfg(feature = "client")]
 mod client;
@@ -10,8 +13,11 @@ pub use client::*;
 mod server;
 #[cfg(feature = "server")]
 pub use server::*;
-use tokio_util::sync::CancellationToken;
+#[cfg(feature = "tower")]
+mod tower;
+pub use tower::*;
 
+use tokio_util::sync::CancellationToken;
 #[derive(Error, Debug)]
 #[non_exhaustive]
 pub enum ServiceError {
@@ -23,6 +29,8 @@ pub enum ServiceError {
     UnexpectedResponse,
     #[error("task cancelled for reason {}", reason.as_deref().unwrap_or("<unknown>"))]
     Cancelled { reason: Option<String> },
+    #[error("request timeout after {}", chrono::Duration::from_std(*timeout).unwrap_or_default())]
+    Timeout { timeout: Duration },
 }
 
 impl ServiceError {}
@@ -43,7 +51,7 @@ impl<T> TransferObject for T where
 }
 
 #[allow(private_bounds, reason = "there's no the third implementation")]
-pub trait ServiceRole: std::fmt::Debug + Send + Sync + 'static + Copy {
+pub trait ServiceRole: std::fmt::Debug + Send + Sync + 'static + Copy + Clone {
     type Req: TransferObject;
     type Resp: TransferObject;
     type Not: TryInto<CancelledNotification, Error = Self::Not>
@@ -59,13 +67,19 @@ pub trait ServiceRole: std::fmt::Debug + Send + Sync + 'static + Copy {
     type PeerInfo: TransferObject;
 }
 
-pub(crate) type TxJsonRpcMessage<R> =
+pub type TxJsonRpcMessage<R> =
     JsonRpcMessage<<R as ServiceRole>::Req, <R as ServiceRole>::Resp, <R as ServiceRole>::Not>;
-pub(crate) type RxJsonRpcMessage<R> = JsonRpcMessage<
+pub type RxJsonRpcMessage<R> = JsonRpcMessage<
     <R as ServiceRole>::PeerReq,
     <R as ServiceRole>::PeerResp,
     <R as ServiceRole>::PeerNot,
 >;
+
+pub type TxMessage<R> =
+    Message<<R as ServiceRole>::Req, <R as ServiceRole>::Resp, <R as ServiceRole>::Not>;
+pub type RxMessage<R> =
+    Message<<R as ServiceRole>::PeerReq, <R as ServiceRole>::PeerResp, <R as ServiceRole>::PeerNot>;
+
 pub trait Service: Send + Sync + 'static {
     type Role: ServiceRole;
     fn handle_request(
@@ -79,15 +93,95 @@ pub trait Service: Send + Sync + 'static {
     ) -> impl Future<Output = Result<(), McpError>> + Send + '_;
     fn get_peer(&self) -> Option<Peer<Self::Role>>;
     fn set_peer(&mut self, peer: Peer<Self::Role>);
-    fn set_peer_info(&mut self, peer: <Self::Role as ServiceRole>::PeerInfo);
-    fn get_peer_info(&self) -> Option<<Self::Role as ServiceRole>::PeerInfo>;
     fn get_info(&self) -> <Self::Role as ServiceRole>::Info;
+}
+
+pub trait ServiceExt: Service {
+    fn into_dyn(self) -> Box<dyn DynService<Self::Role>>;
+}
+
+impl<S: Service> ServiceExt for S {
+    /// Convert this service to a dynamic boxed service
+    ///
+    /// This could be very helpful when you want to store the services in a collection
+    fn into_dyn(self) -> Box<dyn DynService<S::Role>> {
+        Box::new(self)
+    }
+}
+
+impl<R: ServiceRole> Service for Box<dyn DynService<R>> {
+    type Role = R;
+
+    fn handle_request(
+        &self,
+        request: <Self::Role as ServiceRole>::PeerReq,
+        context: RequestContext<Self::Role>,
+    ) -> impl Future<Output = Result<<Self::Role as ServiceRole>::Resp, McpError>> + Send + '_ {
+        DynService::handle_request(self.as_ref(), request, context)
+    }
+
+    fn handle_notification(
+        &self,
+        notification: <Self::Role as ServiceRole>::PeerNot,
+    ) -> impl Future<Output = Result<(), McpError>> + Send + '_ {
+        DynService::handle_notification(self.as_ref(), notification)
+    }
+
+    fn get_peer(&self) -> Option<Peer<Self::Role>> {
+        DynService::get_peer(self.as_ref())
+    }
+
+    fn set_peer(&mut self, peer: Peer<Self::Role>) {
+        DynService::set_peer(self.as_mut(), peer)
+    }
+
+    fn get_info(&self) -> <Self::Role as ServiceRole>::Info {
+        DynService::get_info(self.as_ref())
+    }
+}
+
+pub trait DynService<R: ServiceRole>: Send + Sync {
+    fn handle_request(
+        &self,
+        request: R::PeerReq,
+        context: RequestContext<R>,
+    ) -> BoxFuture<Result<R::Resp, McpError>>;
+    fn handle_notification(&self, notification: R::PeerNot) -> BoxFuture<Result<(), McpError>>;
+    fn get_peer(&self) -> Option<Peer<R>>;
+    fn set_peer(&mut self, peer: Peer<R>);
+    fn get_info(&self) -> R::Info;
+}
+
+impl<S: Service> DynService<S::Role> for S {
+    fn handle_request(
+        &self,
+        request: <S::Role as ServiceRole>::PeerReq,
+        context: RequestContext<S::Role>,
+    ) -> BoxFuture<Result<<S::Role as ServiceRole>::Resp, McpError>> {
+        Box::pin(self.handle_request(request, context))
+    }
+    fn handle_notification(
+        &self,
+        notification: <S::Role as ServiceRole>::PeerNot,
+    ) -> BoxFuture<Result<(), McpError>> {
+        Box::pin(self.handle_notification(notification))
+    }
+    fn get_peer(&self) -> Option<Peer<S::Role>> {
+        self.get_peer()
+    }
+    fn set_peer(&mut self, peer: Peer<S::Role>) {
+        self.set_peer(peer)
+    }
+    fn get_info(&self) -> <S::Role as ServiceRole>::Info {
+        self.get_info()
+    }
 }
 
 use std::collections::HashMap;
 use std::ops::Deref;
 use std::sync::Arc;
 use std::sync::atomic::AtomicU32;
+use std::time::Duration;
 
 use tokio::sync::mpsc;
 
@@ -110,20 +204,61 @@ type Responder<T> = tokio::sync::oneshot::Sender<T>;
 
 /// A handle to a remote request
 ///
-/// You can cancel it by call [`Peer::send_notification`] with [`CancelledNotification`]
+/// You can cancel it by call [`RequestHandle::cancel`] with a reason,
 ///
 /// or wait for response by call [`RequestHandle::await_response`]
 #[derive(Debug)]
 pub struct RequestHandle<R: ServiceRole> {
-    rx: tokio::sync::oneshot::Receiver<Result<R::PeerResp, ServiceError>>,
+    pub rx: tokio::sync::oneshot::Receiver<Result<R::PeerResp, ServiceError>>,
+    pub options: PeerRequestOptions,
+    pub peer: Peer<R>,
     pub id: RequestId,
 }
 
 impl<R: ServiceRole> RequestHandle<R> {
+    pub const REQUEST_TIMEOUT_REASON: &str = "request timeout";
     pub async fn await_response(self) -> Result<R::PeerResp, ServiceError> {
-        self.rx
-            .await
-            .map_err(|_e| ServiceError::Transport(std::io::Error::other("disconnected")))?
+        if let Some(timeout) = self.options.timeout {
+            let timeout_result = tokio::time::timeout(timeout, async move {
+                self.rx
+                    .await
+                    .map_err(|_e| ServiceError::Transport(std::io::Error::other("disconnected")))?
+            })
+            .await;
+            match timeout_result {
+                Ok(response) => response,
+                Err(_) => {
+                    let error = Err(ServiceError::Timeout { timeout });
+                    // cancel this request
+                    let notification = CancelledNotification {
+                        params: CancelledNotificationParam {
+                            request_id: self.id,
+                            reason: Some(Self::REQUEST_TIMEOUT_REASON.to_owned()),
+                        },
+                        method: crate::model::CancelledNotificationMethod,
+                    };
+                    let _ = self.peer.send_notification(notification.into()).await;
+                    error
+                }
+            }
+        } else {
+            self.rx
+                .await
+                .map_err(|_e| ServiceError::Transport(std::io::Error::other("disconnected")))?
+        }
+    }
+
+    /// Cancel this request
+    pub async fn cancel(self, reason: Option<String>) -> Result<(), ServiceError> {
+        let notification = CancelledNotification {
+            params: CancelledNotificationParam {
+                request_id: self.id,
+                reason,
+            },
+            method: crate::model::CancelledNotificationMethod,
+        };
+        self.peer.send_notification(notification.into()).await?;
+        Ok(())
     }
 }
 
@@ -146,7 +281,7 @@ pub enum PeerSinkMessage<R: ServiceRole> {
 pub struct Peer<R: ServiceRole> {
     tx: mpsc::Sender<PeerSinkMessage<R>>,
     request_id_provider: Arc<dyn RequestIdProvider>,
-    info: R::PeerInfo,
+    info: Arc<R::PeerInfo>,
 }
 
 impl<R: ServiceRole> std::fmt::Debug for Peer<R> {
@@ -159,6 +294,18 @@ impl<R: ServiceRole> std::fmt::Debug for Peer<R> {
 }
 
 type ProxyOutbound<R> = mpsc::Receiver<PeerSinkMessage<R>>;
+
+#[derive(Debug, Default)]
+pub struct PeerRequestOptions {
+    timeout: Option<Duration>,
+}
+
+impl PeerRequestOptions {
+    pub fn no_options() -> Self {
+        Self::default()
+    }
+}
+
 impl<R: ServiceRole> Peer<R> {
     const CLIENT_CHANNEL_BUFFER_SIZE: usize = 1024;
     pub fn new(
@@ -170,7 +317,7 @@ impl<R: ServiceRole> Peer<R> {
             Self {
                 tx,
                 request_id_provider,
-                info: peer_info,
+                info: peer_info.into(),
             },
             rx,
         )
@@ -186,7 +333,7 @@ impl<R: ServiceRole> Peer<R> {
             .map_err(|_e| ServiceError::Transport(std::io::Error::other("disconnected")))?
     }
     pub async fn send_request(&self, request: R::Req) -> Result<R::PeerResp, ServiceError> {
-        self.send_cancellable_request(request)
+        self.send_cancellable_request(request, PeerRequestOptions::no_options())
             .await?
             .await_response()
             .await
@@ -194,6 +341,7 @@ impl<R: ServiceRole> Peer<R> {
     pub async fn send_cancellable_request(
         &self,
         request: R::Req,
+        options: PeerRequestOptions,
     ) -> Result<RequestHandle<R>, ServiceError> {
         let id = self.request_id_provider.next_request_id();
         let (responder, receiver) = tokio::sync::oneshot::channel();
@@ -201,7 +349,12 @@ impl<R: ServiceRole> Peer<R> {
             .send(PeerSinkMessage::Request(request, id.clone(), responder))
             .await
             .map_err(|_m| ServiceError::Transport(std::io::Error::other("disconnected")))?;
-        Ok(RequestHandle { id, rx: receiver })
+        Ok(RequestHandle {
+            id,
+            rx: receiver,
+            options,
+            peer: self.clone(),
+        })
     }
     pub fn peer_info(&self) -> &R::PeerInfo {
         &self.info

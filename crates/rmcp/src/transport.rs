@@ -50,6 +50,9 @@ pub mod io;
 #[cfg(feature = "transport-sse")]
 pub mod sse;
 
+// #[cfg(feature = "tower")]
+// pub mod tower;
+
 pub trait IntoTransport<R, E, A>: Send + 'static
 where
     R: ServiceRole,

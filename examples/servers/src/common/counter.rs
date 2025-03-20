@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use rmcp::{
     Error as McpError, RoleServer, ServerHandler, const_string, model::*, schemars,
-    service::RequestContext, tool, tool_box,
+    service::RequestContext, tool,
 };
 
 use serde_json::json;
@@ -18,7 +18,7 @@ pub struct StructRequest {
 pub struct Counter {
     counter: Arc<Mutex<i32>>,
 }
-
+#[tool(tool_box)]
 impl Counter {
     pub fn new() -> Self {
         Self {
@@ -81,32 +81,18 @@ impl Counter {
             (a + b).to_string(),
         )]))
     }
-
-    rmcp::tool_box!(Counter {
-        increment,
-        decrement,
-        get_value,
-        say_hello,
-        echo,
-        sum
-    });
 }
 const_string!(Echo = "echo");
+#[tool(tool_box)]
 impl ServerHandler for Counter {
-    tool_box!(@derive);
-
     fn get_info(&self) -> ServerInfo {
         ServerInfo {
             protocol_version: ProtocolVersion::V_2024_11_05,
-            capabilities: ServerCapabilities {
-                experimental: None,
-                logging: None,
-                prompts: Some(PromptsCapability::default()),
-                resources: Some(ResourcesCapability::default()),
-                tools: Some(ToolsCapability {
-                    list_changed: None,
-                }),
-            },
+            capabilities: ServerCapabilities::builder()
+                .enable_prompts()
+                .enable_resources()
+                .enable_tools()
+                .build(),
             server_info: Implementation::from_build_env(),
             instructions: Some("This server provides a counter tool that can increment and decrement values. The counter starts at 0 and can be modified using the 'increment' and 'decrement' tools. Use 'get_value' to check the current count.".to_string()),
         }

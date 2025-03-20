@@ -33,7 +33,7 @@ impl ServiceRole for RoleClient {
 
 pub type ServerSink = Peer<RoleClient>;
 
-pub async fn serve_client<S, T, E, A>(mut service: S, transport: T) -> Result<RunningService<S>, E>
+pub async fn serve_client<S, T, E, A>(service: S, transport: T) -> Result<RunningService<S>, E>
 where
     S: Service<Role = RoleClient>,
     T: IntoTransport<RoleClient, E, A>,
@@ -89,7 +89,6 @@ where
         },
     ));
     sink.send(notification.into_json_rpc_message()).await?;
-    service.set_peer_info(initialize_result.clone());
     serve_inner(service, (sink, stream), initialize_result, id_provider).await
 }
 
