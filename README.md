@@ -49,10 +49,10 @@ For client, the sink item is [`ClientJsonRpcMessage`](crate::model::ClientJsonRp
 For server, the sink item is [`ServerJsonRpcMessage`](crate::model::ServerJsonRpcMessage) and stream item is [`ClientJsonRpcMessage`](crate::model::ClientJsonRpcMessage)
 
 ##### These types is automatically implemented [`IntoTransport`](crate::transport::IntoTransport) trait
-1. For type that already implement both [`Sink`](futures::Sink) and [`Stream`](futures::Stream) trait, they are automatically implemented [`IntoTransport`](crate::transport::IntoTransport) trait
-2. For tuple of sink `Tx` and stream `Rx`, type `(Tx, Rx)` are automatically implemented [`IntoTransport`](crate::transport::IntoTransport) trait
-3. For type that implement both [`tokio::io::AsyncRead`] and [`tokio::io::AsyncWrite`] trait, they are automatically implemented [`IntoTransport`](crate::transport::IntoTransport) trait
-4. For tuple of [`tokio::io::AsyncRead`] `R `and [`tokio::io::AsyncWrite`] `W`, type `(R, W)` are automatically implemented [`IntoTransport`](crate::transport::IntoTransport) trait
+1. The types that already implement both [`Sink`](futures::Sink) and [`Stream`](futures::Stream) trait.
+2. A tuple of sink `Tx` and stream `Rx`: `(Tx, Rx)`.
+3. The type that implement both [`tokio::io::AsyncRead`] and [`tokio::io::AsyncWrite`] trait.
+4. A tuple of [`tokio::io::AsyncRead`] `R `and [`tokio::io::AsyncWrite`] `W`:  `(R, W)`.
 
 For example, you can see how we build a transport through TCP stream or http upgrade so easily. [examples](examples/README.md)
 
@@ -62,10 +62,6 @@ You can easily build a service by using [`ServerHandler`](crates/rmcp/src/handle
 ```rust, ignore
 let service = common::counter::Counter::new();
 ```
-
-Or if you want to use `tower`, you can [`TowerHandler`] as a adapter.
-
-You can reference the [server examples](examples/servers/src/common/counter.rs).
 
 #### 3. Serve them together
 ```rust, ignore
