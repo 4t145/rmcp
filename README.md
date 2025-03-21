@@ -1,3 +1,7 @@
+<div align = "right">
+<a href="docs/readme/README.zh-cn.md">简体中文</a>
+</div>
+
 # RMCP
 [![Crates.io Version](https://img.shields.io/crates/v/rmcp)](https://crates.io/crates/rmcp)
 ![Release status](https://github.com/4t145/rmcp/actions/workflows/release.yml/badge.svg)
@@ -13,14 +17,31 @@ All the features listed on specification would be implemented in this crate. And
 
 ## Usage
 
-### Import from github
+### Import
 ```toml
 rmcp = { version = "0.1", features = ["server"] }
+## or dev channel
+rmcp = { git = "https://github.com/4t145/rmcp", branch = "dev" }
 ```
 
 ### Quick start
+Start a client in one line:
+```rust
+use rmcp::{ServiceExt, transport::child_process::TokioChildProcess};
+use tokio::process::Command;
+
+let client = ().serve(
+    TokioChildProcess::new(Command::new("npx").arg("-y").arg("@modelcontextprotocol/server-everything"))?
+).await?;
+```
 
 #### 1. Build a transport
+
+```rust, ignore
+use tokio::io::{stdin, stdout};
+let transport = (stdin(), stdout());
+```
+
 The transport type must implemented [`IntoTransport`](crate::transport::IntoTransport) trait, which allow split into a sink and a stream.
 
 For client, the sink item is [`ClientJsonRpcMessage`](crate::model::ClientJsonRpcMessage) and stream item is [`ServerJsonRpcMessage`](crate::model::ServerJsonRpcMessage)
@@ -33,18 +54,13 @@ For server, the sink item is [`ServerJsonRpcMessage`](crate::model::ServerJsonRp
 3. For type that implement both [`tokio::io::AsyncRead`] and [`tokio::io::AsyncWrite`] trait, they are automatically implemented [`IntoTransport`](crate::transport::IntoTransport) trait
 4. For tuple of [`tokio::io::AsyncRead`] `R `and [`tokio::io::AsyncWrite`] `W`, type `(R, W)` are automatically implemented [`IntoTransport`](crate::transport::IntoTransport) trait
 
-
-```rust, ignore
-use tokio::io::{stdin, stdout};
-let transport = (stdin(), stdout());
-```
+For example, you can see how we build a transport through TCP stream or http upgrade so easily. [examples](examples/README.md)
 
 #### 2. Build a service
-You can easily build a service by using [`ServerHandlerService`](crates/rmcp/src/handler/server.rs) or [`ClientHandlerService`](crates/rmcp/src/handler/client.rs).
+You can easily build a service by using [`ServerHandler`](crates/rmcp/src/handler/server.rs) or [`ClientHandler`](crates/rmcp/src/handler/client.rs).
 
 ```rust, ignore
-use rmcp::ServerHandlerService;
-let service = ServerHandlerService::new(common::counter::Counter::new());
+let service = common::counter::Counter::new();
 ```
 
 Or if you want to use `tower`, you can [`TowerHandler`] as a adapter.
@@ -54,7 +70,7 @@ You can reference the [server examples](examples/servers/src/common/counter.rs).
 #### 3. Serve them together
 ```rust, ignore
 // this call will finish the initialization process
-let server = rmcp::serve_server(service, transport).await?;
+let server = service.serve(transport).await?;
 ```
 
 #### 4. Interact with the server

@@ -6,7 +6,7 @@ use axum::{
     routing::get,
 };
 use futures::{SinkExt, StreamExt, stream::Stream};
-use rmcp::{ServerHandlerService, model::ClientJsonRpcMessage, serve_server};
+use rmcp::{ServiceExt, model::ClientJsonRpcMessage};
 use std::collections::HashMap;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
@@ -85,14 +85,12 @@ async fn sse_handler(State(app): State<App>) -> Sse<impl Stream<Item = Result<Ev
     {
         let session = session.clone();
         tokio::spawn(async move {
-            let service = ServerHandlerService::new(common::counter::Counter::new());
+            let service = common::counter::Counter::new();
             let stream = ReceiverStream::new(from_client_rx);
             let sink = PollSender::new(to_client_tx).sink_map_err(std::io::Error::other);
-            let result = serve_server(service, (sink, stream))
-                .await
-                .inspect_err(|e| {
-                    tracing::error!("serving error: {:?}", e);
-                });
+            let result = service.serve((sink, stream)).await.inspect_err(|e| {
+                tracing::error!("serving error: {:?}", e);
+            });
 
             if let Err(e) = result {
                 tracing::error!(error = ?e, "initialize error");

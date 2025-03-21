@@ -2,42 +2,19 @@ use crate::error::Error as McpError;
 use crate::model::*;
 use crate::service::{Peer, RequestContext, RoleClient, Service, ServiceRole};
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
-pub struct ClientHandlerService<H = Option<Peer<RoleClient>>> {
-    pub handler: H,
-}
-
-impl ClientHandlerService<Option<Peer<RoleClient>>> {
-    pub fn simple() -> Self {
-        Self { handler: None }
-    }
-}
-
-impl<H: ClientHandler> ClientHandlerService<H> {
-    pub fn new(handler: H) -> Self {
-        Self { handler }
-    }
-}
-
-impl<H: ClientHandler> Service for ClientHandlerService<H> {
-    type Role = RoleClient;
-
+impl<H: ClientHandler> Service<RoleClient> for H {
     async fn handle_request(
         &self,
-        request: <Self::Role as ServiceRole>::PeerReq,
-        context: RequestContext<Self::Role>,
-    ) -> Result<<Self::Role as ServiceRole>::Resp, McpError> {
+        request: <RoleClient as ServiceRole>::PeerReq,
+        context: RequestContext<RoleClient>,
+    ) -> Result<<RoleClient as ServiceRole>::Resp, McpError> {
         match request {
-            ServerRequest::PingRequest(_) => {
-                self.handler.ping(context).await.map(ClientResult::empty)
-            }
+            ServerRequest::PingRequest(_) => self.ping(context).await.map(ClientResult::empty),
             ServerRequest::CreateMessageRequest(request) => self
-                .handler
                 .create_message(request.params, context)
                 .await
                 .map(ClientResult::CreateMessageResult),
             ServerRequest::ListRootsRequest(_) => self
-                .handler
                 .list_roots(context)
                 .await
                 .map(ClientResult::ListRootsResult),
@@ -46,44 +23,44 @@ impl<H: ClientHandler> Service for ClientHandlerService<H> {
 
     async fn handle_notification(
         &self,
-        notification: <Self::Role as ServiceRole>::PeerNot,
+        notification: <RoleClient as ServiceRole>::PeerNot,
     ) -> Result<(), McpError> {
         match notification {
             ServerNotification::CancelledNotification(notification) => {
-                self.handler.on_cancelled(notification.params).await
+                self.on_cancelled(notification.params).await
             }
             ServerNotification::ProgressNotification(notification) => {
-                self.handler.on_progress(notification.params).await
+                self.on_progress(notification.params).await
             }
             ServerNotification::LoggingMessageNotification(notification) => {
-                self.handler.on_logging_message(notification.params).await
+                self.on_logging_message(notification.params).await
             }
             ServerNotification::ResourceUpdatedNotification(notification) => {
-                self.handler.on_resource_updated(notification.params).await
+                self.on_resource_updated(notification.params).await
             }
             ServerNotification::ResourceListChangedNotification(_notification_no_param) => {
-                self.handler.on_resource_list_changed().await
+                self.on_resource_list_changed().await
             }
             ServerNotification::ToolListChangedNotification(_notification_no_param) => {
-                self.handler.on_tool_list_changed().await
+                self.on_tool_list_changed().await
             }
             ServerNotification::PromptListChangedNotification(_notification_no_param) => {
-                self.handler.on_prompt_list_changed().await
+                self.on_prompt_list_changed().await
             }
         };
         Ok(())
     }
 
-    fn get_peer(&self) -> Option<Peer<Self::Role>> {
-        self.handler.get_peer()
+    fn get_peer(&self) -> Option<Peer<RoleClient>> {
+        self.get_peer()
     }
 
-    fn set_peer(&mut self, peer: Peer<Self::Role>) {
-        self.handler.set_peer(peer);
+    fn set_peer(&mut self, peer: Peer<RoleClient>) {
+        self.set_peer(peer);
     }
 
-    fn get_info(&self) -> <Self::Role as ServiceRole>::Info {
-        self.handler.get_info()
+    fn get_info(&self) -> <RoleClient as ServiceRole>::Info {
+        self.get_info()
     }
 }
 
@@ -155,7 +132,7 @@ pub trait ClientHandler: Sized + Send + Sync + 'static {
     }
 }
 
-/// I will call it the "Default" client implementation.
+/// Do nothing, just store the peer.
 impl ClientHandler for Option<Peer<RoleClient>> {
     fn get_peer(&self) -> Option<Peer<RoleClient>> {
         self.clone()
@@ -163,5 +140,31 @@ impl ClientHandler for Option<Peer<RoleClient>> {
 
     fn set_peer(&mut self, peer: Peer<RoleClient>) {
         *self = Some(peer);
+    }
+}
+
+/// Do nothing, even store the peer.
+impl ClientHandler for () {
+    fn get_peer(&self) -> Option<Peer<RoleClient>> {
+        None
+    }
+
+    fn set_peer(&mut self, peer: Peer<RoleClient>) {
+        drop(peer);
+    }
+}
+
+/// Do nothing, even store the peer.
+impl ClientHandler for ClientInfo {
+    fn get_peer(&self) -> Option<Peer<RoleClient>> {
+        None
+    }
+
+    fn set_peer(&mut self, peer: Peer<RoleClient>) {
+        drop(peer);
+    }
+
+    fn get_info(&self) -> ClientInfo {
+        self.clone()
     }
 }

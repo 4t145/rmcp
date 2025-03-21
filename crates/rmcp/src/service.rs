@@ -81,62 +81,63 @@ pub type TxMessage<R> =
 pub type RxMessage<R> =
     Message<<R as ServiceRole>::PeerReq, <R as ServiceRole>::PeerResp, <R as ServiceRole>::PeerNot>;
 
-pub trait Service: Send + Sync + 'static {
-    type Role: ServiceRole;
+pub trait Service<R: ServiceRole>: Send + Sync + 'static {
     fn handle_request(
         &self,
-        request: <Self::Role as ServiceRole>::PeerReq,
-        context: RequestContext<Self::Role>,
-    ) -> impl Future<Output = Result<<Self::Role as ServiceRole>::Resp, McpError>> + Send + '_;
+        request: R::PeerReq,
+        context: RequestContext<R>,
+    ) -> impl Future<Output = Result<R::Resp, McpError>> + Send + '_;
     fn handle_notification(
         &self,
-        notification: <Self::Role as ServiceRole>::PeerNot,
+        notification: R::PeerNot,
     ) -> impl Future<Output = Result<(), McpError>> + Send + '_;
-    fn get_peer(&self) -> Option<Peer<Self::Role>>;
-    fn set_peer(&mut self, peer: Peer<Self::Role>);
-    fn get_info(&self) -> <Self::Role as ServiceRole>::Info;
+    fn get_peer(&self) -> Option<Peer<R>>;
+    fn set_peer(&mut self, peer: Peer<R>);
+    fn get_info(&self) -> R::Info;
 }
 
-pub trait ServiceExt: Service {
-    fn into_dyn(self) -> Box<dyn DynService<Self::Role>>;
-}
-
-impl<S: Service> ServiceExt for S {
+pub trait ServiceExt<R: ServiceRole>: Service<R> + Sized {
     /// Convert this service to a dynamic boxed service
     ///
     /// This could be very helpful when you want to store the services in a collection
-    fn into_dyn(self) -> Box<dyn DynService<S::Role>> {
+    fn into_dyn(self) -> Box<dyn DynService<R>> {
         Box::new(self)
     }
+    fn serve<T, E, A>(
+        self,
+        transport: T,
+    ) -> impl Future<Output = Result<RunningService<R, Self>, E>> + Send
+    where
+        T: IntoTransport<R, E, A>,
+        E: std::error::Error + From<std::io::Error> + Send + Sync + 'static,
+        Self: Sized;
 }
 
-impl<R: ServiceRole> Service for Box<dyn DynService<R>> {
-    type Role = R;
-
+impl<R: ServiceRole> Service<R> for Box<dyn DynService<R>> {
     fn handle_request(
         &self,
-        request: <Self::Role as ServiceRole>::PeerReq,
-        context: RequestContext<Self::Role>,
-    ) -> impl Future<Output = Result<<Self::Role as ServiceRole>::Resp, McpError>> + Send + '_ {
+        request: R::PeerReq,
+        context: RequestContext<R>,
+    ) -> impl Future<Output = Result<R::Resp, McpError>> + Send + '_ {
         DynService::handle_request(self.as_ref(), request, context)
     }
 
     fn handle_notification(
         &self,
-        notification: <Self::Role as ServiceRole>::PeerNot,
+        notification: R::PeerNot,
     ) -> impl Future<Output = Result<(), McpError>> + Send + '_ {
         DynService::handle_notification(self.as_ref(), notification)
     }
 
-    fn get_peer(&self) -> Option<Peer<Self::Role>> {
+    fn get_peer(&self) -> Option<Peer<R>> {
         DynService::get_peer(self.as_ref())
     }
 
-    fn set_peer(&mut self, peer: Peer<Self::Role>) {
+    fn set_peer(&mut self, peer: Peer<R>) {
         DynService::set_peer(self.as_mut(), peer)
     }
 
-    fn get_info(&self) -> <Self::Role as ServiceRole>::Info {
+    fn get_info(&self) -> R::Info {
         DynService::get_info(self.as_ref())
     }
 }
@@ -153,27 +154,24 @@ pub trait DynService<R: ServiceRole>: Send + Sync {
     fn get_info(&self) -> R::Info;
 }
 
-impl<S: Service> DynService<S::Role> for S {
+impl<R: ServiceRole, S: Service<R>> DynService<R> for S {
     fn handle_request(
         &self,
-        request: <S::Role as ServiceRole>::PeerReq,
-        context: RequestContext<S::Role>,
-    ) -> BoxFuture<Result<<S::Role as ServiceRole>::Resp, McpError>> {
+        request: R::PeerReq,
+        context: RequestContext<R>,
+    ) -> BoxFuture<Result<R::Resp, McpError>> {
         Box::pin(self.handle_request(request, context))
     }
-    fn handle_notification(
-        &self,
-        notification: <S::Role as ServiceRole>::PeerNot,
-    ) -> BoxFuture<Result<(), McpError>> {
+    fn handle_notification(&self, notification: R::PeerNot) -> BoxFuture<Result<(), McpError>> {
         Box::pin(self.handle_notification(notification))
     }
-    fn get_peer(&self) -> Option<Peer<S::Role>> {
+    fn get_peer(&self) -> Option<Peer<R>> {
         self.get_peer()
     }
-    fn set_peer(&mut self, peer: Peer<S::Role>) {
+    fn set_peer(&mut self, peer: Peer<R>) {
         self.set_peer(peer)
     }
-    fn get_info(&self) -> <S::Role as ServiceRole>::Info {
+    fn get_info(&self) -> R::Info {
         self.get_info()
     }
 }
@@ -363,24 +361,24 @@ impl<R: ServiceRole> Peer<R> {
 }
 
 #[derive(Debug)]
-pub struct RunningService<S: Service> {
+pub struct RunningService<R: ServiceRole, S: Service<R>> {
     service: Arc<S>,
-    peer: Peer<S::Role>,
+    peer: Peer<R>,
     handle: tokio::task::JoinHandle<QuitReason>,
     /// cancellation token
     ct: CancellationToken,
 }
-impl<S: Service> Deref for RunningService<S> {
-    type Target = Peer<S::Role>;
+impl<R: ServiceRole, S: Service<R>> Deref for RunningService<R, S> {
+    type Target = Peer<R>;
 
     fn deref(&self) -> &Self::Target {
         self.peer()
     }
 }
 
-impl<S: Service> RunningService<S> {
+impl<R: ServiceRole, S: Service<R>> RunningService<R, S> {
     #[inline]
-    pub fn peer(&self) -> &Peer<S::Role> {
+    pub fn peer(&self) -> &Peer<R> {
         &self.peer
     }
     #[inline]
@@ -413,48 +411,45 @@ pub struct RequestContext<R: ServiceRole> {
 }
 
 /// Use this function to skip initialization process
-pub async fn serve_directly<S, T, E, A>(
+pub async fn serve_directly<R, S, T, E, A>(
     service: S,
     transport: T,
-    peer_info: <S::Role as ServiceRole>::PeerInfo,
-) -> Result<RunningService<S>, E>
+    peer_info: R::PeerInfo,
+) -> Result<RunningService<R, S>, E>
 where
-    S: Service,
-    T: IntoTransport<S::Role, E, A>,
+    R: ServiceRole,
+    S: Service<R>,
+    T: IntoTransport<R, E, A>,
     E: std::error::Error + Send + Sync + 'static,
 {
     serve_inner(service, transport, peer_info, Default::default()).await
 }
 
-async fn serve_inner<S, T, E, A>(
+async fn serve_inner<R, S, T, E, A>(
     mut service: S,
     transport: T,
-    peer_info: <S::Role as ServiceRole>::PeerInfo,
+    peer_info: R::PeerInfo,
     id_provider: Arc<AtomicU32RequestIdProvider>,
-) -> Result<RunningService<S>, E>
+) -> Result<RunningService<R, S>, E>
 where
-    S: Service,
-    T: IntoTransport<S::Role, E, A>,
+    R: ServiceRole,
+    S: Service<R>,
+    T: IntoTransport<R, E, A>,
     E: std::error::Error + Send + Sync + 'static,
 {
     use futures::{SinkExt, StreamExt};
     const SINK_PROXY_BUFFER_SIZE: usize = 64;
-    tracing::info!("Server started");
     let (sink_proxy_tx, mut sink_proxy_rx) = tokio::sync::mpsc::channel::<
-        Message<
-            <S::Role as ServiceRole>::Req,
-            <S::Role as ServiceRole>::Resp,
-            <S::Role as ServiceRole>::Not,
-        >,
+        Message<<R as ServiceRole>::Req, <R as ServiceRole>::Resp, <R as ServiceRole>::Not>,
     >(SINK_PROXY_BUFFER_SIZE);
 
-    if S::Role::IS_CLIENT {
-        tracing::info!(?peer_info, "Server initialized as client");
+    if R::IS_CLIENT {
+        tracing::info!(?peer_info, "Service initialized as client");
     } else {
-        tracing::info!(?peer_info, "Server initialized as server");
+        tracing::info!(?peer_info, "Service initialized as server");
     }
 
-    let (peer, mut peer_proxy) = <Peer<S::Role>>::new(id_provider, peer_info);
+    let (peer, mut peer_proxy) = <Peer<R>>::new(id_provider, peer_info);
     service.set_peer(peer.clone());
     let mut local_responder_pool = HashMap::new();
     let mut local_ct_pool = HashMap::<RequestId, CancellationToken>::new();
@@ -466,7 +461,7 @@ where
     // let mut stream = std::pin::pin!(stream);
     let ct = CancellationToken::new();
     let serve_loop_ct = ct.child_token();
-    let peer_return: Peer<<S as Service>::Role> = peer.clone();
+    let peer_return: Peer<R> = peer.clone();
     let handle = tokio::spawn(async move {
         let (mut sink, mut stream) = transport.into_transport();
         let mut sink = std::pin::pin!(sink);

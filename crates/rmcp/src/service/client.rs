@@ -33,9 +33,26 @@ impl ServiceRole for RoleClient {
 
 pub type ServerSink = Peer<RoleClient>;
 
-pub async fn serve_client<S, T, E, A>(service: S, transport: T) -> Result<RunningService<S>, E>
+impl<S: Service<RoleClient>> ServiceExt<RoleClient> for S {
+    fn serve<T, E, A>(
+        self,
+        transport: T,
+    ) -> impl Future<Output = Result<RunningService<RoleClient, Self>, E>> + Send
+    where
+        T: IntoTransport<RoleClient, E, A>,
+        E: std::error::Error + From<std::io::Error> + Send + Sync + 'static,
+        Self: Sized,
+    {
+        serve_client(self, transport)
+    }
+}
+
+pub async fn serve_client<S, T, E, A>(
+    service: S,
+    transport: T,
+) -> Result<RunningService<RoleClient, S>, E>
 where
-    S: Service<Role = RoleClient>,
+    S: Service<RoleClient>,
     T: IntoTransport<RoleClient, E, A>,
     E: std::error::Error + From<std::io::Error> + Send + Sync + 'static,
 {
@@ -173,4 +190,80 @@ impl Peer<RoleClient> {
     method!(peer_not notify_progress ProgressNotification(ProgressNotificationParam));
     method!(peer_not notify_initialized InitializedNotification);
     method!(peer_not notify_roots_list_changed RootsListChangedNotification);
+}
+
+impl Peer<RoleClient> {
+    /// A wrapper method for [`Peer<RoleClient>::list_tools`].
+    ///
+    /// This function will call [`Peer<RoleClient>::list_tools`] multiple times until all tools are listed.
+    pub async fn list_all_tools(&self) -> Result<Vec<crate::model::Tool>, ServiceError> {
+        let mut tools = Vec::new();
+        let mut cursor = None;
+        loop {
+            let result = self.list_tools(PaginatedRequestParam { cursor }).await?;
+            tools.extend(result.tools);
+            cursor = result.next_cursor;
+            if cursor.is_none() {
+                break;
+            }
+        }
+        Ok(tools)
+    }
+
+    /// A wrapper method for [`Peer<RoleClient>::list_resources`].
+    ///
+    /// This function will call [`Peer<RoleClient>::list_resources`] multiple times until all resources are listed.
+    pub async fn list_all_prompts(&self) -> Result<Vec<crate::model::Prompt>, ServiceError> {
+        let mut prompts = Vec::new();
+        let mut cursor = None;
+        loop {
+            let result = self.list_prompts(PaginatedRequestParam { cursor }).await?;
+            prompts.extend(result.prompts);
+            cursor = result.next_cursor;
+            if cursor.is_none() {
+                break;
+            }
+        }
+        Ok(prompts)
+    }
+
+    /// A wrapper method for [`Peer<RoleClient>::list_resources`].
+    ///
+    /// This function will call [`Peer<RoleClient>::list_resources`] multiple times until all resources are listed.
+    pub async fn list_all_resources(&self) -> Result<Vec<crate::model::Resource>, ServiceError> {
+        let mut resources = Vec::new();
+        let mut cursor = None;
+        loop {
+            let result = self
+                .list_resources(PaginatedRequestParam { cursor })
+                .await?;
+            resources.extend(result.resources);
+            cursor = result.next_cursor;
+            if cursor.is_none() {
+                break;
+            }
+        }
+        Ok(resources)
+    }
+
+    /// A wrapper method for [`Peer<RoleClient>::list_resource_templates`].
+    ///
+    /// This function will call [`Peer<RoleClient>::list_resource_templates`] multiple times until all resource templates are listed.
+    pub async fn list_all_resource_templates(
+        &self,
+    ) -> Result<Vec<crate::model::ResourceTemplate>, ServiceError> {
+        let mut resource_templates = Vec::new();
+        let mut cursor = None;
+        loop {
+            let result = self
+                .list_resource_templates(PaginatedRequestParam { cursor })
+                .await?;
+            resource_templates.extend(result.resource_templates);
+            cursor = result.next_cursor;
+            if cursor.is_none() {
+                break;
+            }
+        }
+        Ok(resource_templates)
+    }
 }
