@@ -1,3 +1,7 @@
+<div align = "right">
+<a href="docs/readme/README.zh-cn.md">简体中文</a>
+</div>
+
 # RMCP
 [![Crates.io Version](https://img.shields.io/crates/v/rmcp)](https://crates.io/crates/rmcp)
 ![Release status](https://github.com/4t145/rmcp/actions/workflows/release.yml/badge.svg)
