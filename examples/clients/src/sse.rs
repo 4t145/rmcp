@@ -15,7 +15,7 @@ async fn main() -> Result<()> {
         )
         .with(tracing_subscriber::fmt::layer())
         .init();
-    let transport = SseTransport::start("http://localhost:8000/sse", Default::default()).await?;
+    let transport = SseTransport::start("http://localhost:8000/sse").await?;
     let client_info = ClientInfo {
         protocol_version: Default::default(),
         capabilities: ClientCapabilities::default(),
@@ -36,11 +36,10 @@ async fn main() -> Result<()> {
     let tools = client.list_tools(Default::default()).await?;
     tracing::info!("Available tools: {tools:#?}");
 
-    // Call tool 'git_status' with arguments = {"repo_path": "."}
     let tool_result = client
         .call_tool(CallToolRequestParam {
-            name: "git_status".into(),
-            arguments: serde_json::json!({ "repo_path": "." }).as_object().cloned(),
+            name: "increment".into(),
+            arguments: serde_json::json!({}).as_object().cloned(),
         })
         .await?;
     tracing::info!("Tool result: {tool_result:#?}");
