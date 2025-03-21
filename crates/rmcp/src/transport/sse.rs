@@ -171,6 +171,16 @@ impl SseTransport {
             }
             let response = request_builder.send().await?;
             let response = response.error_for_status()?;
+            match response.headers().get(reqwest::header::CONTENT_TYPE) {
+                Some(ct) => {
+                    if ct.as_bytes() != MIME_TYPE.as_bytes() {
+                        return Err(SseTransportError::UnexpectedContentType(Some(ct.clone())));
+                    }
+                }
+                None => {
+                    return Err(SseTransportError::UnexpectedContentType(None));
+                }
+            }
             let event_stream = SseStream::from_byte_stream(response.bytes_stream()).boxed();
             Ok(event_stream)
         };
