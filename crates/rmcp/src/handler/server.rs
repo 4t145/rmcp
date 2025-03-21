@@ -4,86 +4,62 @@ use crate::service::{Peer, RequestContext, RoleServer, Service, ServiceRole};
 
 mod resource;
 pub mod tool;
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
-pub struct ServerHandlerService<H> {
-    pub handler: H,
-}
 
-impl<H: ServerHandler> ServerHandlerService<H> {
-    pub fn new(handler: H) -> Self {
-        Self { handler }
-    }
-}
-
-impl<H: ServerHandler> Service for ServerHandlerService<H> {
-    type Role = RoleServer;
-
+impl<H: ServerHandler> Service<RoleServer> for H {
     async fn handle_request(
         &self,
-        request: <Self::Role as ServiceRole>::PeerReq,
-        context: RequestContext<Self::Role>,
-    ) -> Result<<Self::Role as ServiceRole>::Resp, McpError> {
+        request: <RoleServer as ServiceRole>::PeerReq,
+        context: RequestContext<RoleServer>,
+    ) -> Result<<RoleServer as ServiceRole>::Resp, McpError> {
         match request {
             ClientRequest::InitializeRequest(request) => self
-                .handler
                 .initialize(request.params, context)
                 .await
                 .map(ServerResult::InitializeResult),
             ClientRequest::PingRequest(_request) => {
-                self.handler.ping(context).await.map(ServerResult::empty)
+                self.ping(context).await.map(ServerResult::empty)
             }
             ClientRequest::CompleteRequest(request) => self
-                .handler
                 .complete(request.params, context)
                 .await
                 .map(ServerResult::CompleteResult),
             ClientRequest::SetLevelRequest(request) => self
-                .handler
                 .set_level(request.params, context)
                 .await
                 .map(ServerResult::empty),
             ClientRequest::GetPromptRequest(request) => self
-                .handler
                 .get_prompt(request.params, context)
                 .await
                 .map(ServerResult::GetPromptResult),
             ClientRequest::ListPromptsRequest(request) => self
-                .handler
                 .list_prompts(request.params, context)
                 .await
                 .map(ServerResult::ListPromptsResult),
             ClientRequest::ListResourcesRequest(request) => self
-                .handler
                 .list_resources(request.params, context)
                 .await
                 .map(ServerResult::ListResourcesResult),
             ClientRequest::ListResourceTemplatesRequest(request) => self
-                .handler
                 .list_resource_templates(request.params, context)
                 .await
                 .map(ServerResult::ListResourceTemplatesResult),
             ClientRequest::ReadResourceRequest(request) => self
-                .handler
                 .read_resource(request.params, context)
                 .await
                 .map(ServerResult::ReadResourceResult),
             ClientRequest::SubscribeRequest(request) => self
-                .handler
                 .subscribe(request.params, context)
                 .await
                 .map(ServerResult::empty),
             ClientRequest::UnsubscribeRequest(request) => self
-                .handler
                 .unsubscribe(request.params, context)
                 .await
                 .map(ServerResult::empty),
             ClientRequest::CallToolRequest(request) => self
-                .handler
                 .call_tool(request.params, context)
                 .await
                 .map(ServerResult::CallToolResult),
             ClientRequest::ListToolsRequest(request) => self
-                .handler
                 .list_tools(request.params, context)
                 .await
                 .map(ServerResult::ListToolsResult),
@@ -92,35 +68,35 @@ impl<H: ServerHandler> Service for ServerHandlerService<H> {
 
     async fn handle_notification(
         &self,
-        notification: <Self::Role as ServiceRole>::PeerNot,
+        notification: <RoleServer as ServiceRole>::PeerNot,
     ) -> Result<(), McpError> {
         match notification {
             ClientNotification::CancelledNotification(notification) => {
-                self.handler.on_cancelled(notification.params).await
+                self.on_cancelled(notification.params).await
             }
             ClientNotification::ProgressNotification(notification) => {
-                self.handler.on_progress(notification.params).await
+                self.on_progress(notification.params).await
             }
             ClientNotification::InitializedNotification(_notification) => {
-                self.handler.on_initialized().await
+                self.on_initialized().await
             }
             ClientNotification::RootsListChangedNotification(_notification) => {
-                self.handler.on_roots_list_changed().await
+                self.on_roots_list_changed().await
             }
         };
         Ok(())
     }
 
-    fn get_peer(&self) -> Option<Peer<Self::Role>> {
-        self.handler.get_peer()
+    fn get_peer(&self) -> Option<Peer<RoleServer>> {
+        self.get_peer()
     }
 
-    fn set_peer(&mut self, peer: Peer<Self::Role>) {
-        self.handler.set_peer(peer);
+    fn set_peer(&mut self, peer: Peer<RoleServer>) {
+        self.set_peer(peer);
     }
 
-    fn get_info(&self) -> <Self::Role as ServiceRole>::Info {
-        self.handler.get_info()
+    fn get_info(&self) -> <RoleServer as ServiceRole>::Info {
+        self.get_info()
     }
 }
 

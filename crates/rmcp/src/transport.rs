@@ -15,7 +15,7 @@
 //!
 //! ```rust
 //! # use rmcp::{
-//! #     ClientHandlerService, ServerHandlerService, serve_client, serve_server,
+//! #     ServiceExt, serve_client, serve_server,
 //! # };
 //!
 //! // create transport from tcp stream
@@ -23,7 +23,7 @@
 //!     let stream = tokio::net::TcpSocket::new_v4()?
 //!         .connect("127.0.0.1:8001".parse()?)
 //!         .await?;
-//!     let client = serve_client(ClientHandlerService::new(None), stream).await?;
+//!     let client = ().serve(stream).await?;
 //!     let tools = client.peer().list_tools(Default::default()).await?;
 //!     println!("{:?}", tools);
 //!     Ok(())
@@ -31,7 +31,7 @@
 //!
 //! // create transport from std io
 //! async fn io()  -> Result<(), Box<dyn std::error::Error>> {
-//!     let client = serve_client(ClientHandlerService::new(None), (tokio::io::stdin(), tokio::io::stdout())).await?;
+//!     let client = None.serve((tokio::io::stdin(), tokio::io::stdout())).await?;
 //!     let tools = client.peer().list_tools(Default::default()).await?;
 //!     println!("{:?}", tools);
 //!     Ok(())

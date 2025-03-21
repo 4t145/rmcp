@@ -22,19 +22,17 @@ impl<S, R: ServiceRole> TowerHandler<S, R> {
     }
 }
 
-impl<S, R: ServiceRole> Service for TowerHandler<S, R>
+impl<S, R: ServiceRole> Service<R> for TowerHandler<S, R>
 where
     S: TowerService<R::PeerReq, Response = R::Resp> + Sync + Send + Clone + 'static,
     S::Error: Into<crate::Error>,
     S::Future: Send,
 {
-    type Role = R;
-
     async fn handle_request(
         &self,
-        request: <Self::Role as ServiceRole>::PeerReq,
-        _context: RequestContext<Self::Role>,
-    ) -> Result<<Self::Role as ServiceRole>::Resp, crate::Error> {
+        request: R::PeerReq,
+        _context: RequestContext<R>,
+    ) -> Result<R::Resp, crate::Error> {
         let mut service = self.service.clone();
         poll_fn(|cx| service.poll_ready(cx))
             .await
@@ -45,20 +43,20 @@ where
 
     fn handle_notification(
         &self,
-        _notification: <Self::Role as ServiceRole>::PeerNot,
+        _notification: R::PeerNot,
     ) -> impl Future<Output = Result<(), crate::Error>> + Send + '_ {
         std::future::ready(Ok(()))
     }
 
-    fn get_peer(&self) -> Option<Peer<Self::Role>> {
+    fn get_peer(&self) -> Option<Peer<R>> {
         self.peer.clone()
     }
 
-    fn set_peer(&mut self, peer: Peer<Self::Role>) {
+    fn set_peer(&mut self, peer: Peer<R>) {
         self.peer = Some(peer);
     }
 
-    fn get_info(&self) -> <Self::Role as ServiceRole>::Info {
+    fn get_info(&self) -> R::Info {
         self.info.clone()
     }
 }

@@ -1,4 +1,4 @@
-#![doc = include_str!("../../../README.md")]
+#![doc = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/README.md"))]
 mod error;
 pub use error::Error;
 
@@ -7,16 +7,16 @@ pub mod model;
 #[cfg(any(feature = "client", feature = "server"))]
 pub mod service;
 #[cfg(any(feature = "client", feature = "server"))]
-pub use service::{Peer, Service, ServiceError};
+pub use service::{Peer, Service, ServiceError, ServiceExt};
 #[cfg(feature = "client")]
 pub use service::{RoleClient, serve_client};
 #[cfg(feature = "server")]
 pub use service::{RoleServer, serve_server};
 
 #[cfg(feature = "client")]
-pub use handler::client::{ClientHandler, ClientHandlerService};
+pub use handler::client::ClientHandler;
 #[cfg(feature = "server")]
-pub use handler::server::{ServerHandler, ServerHandlerService};
+pub use handler::server::ServerHandler;
 
 pub mod handler;
 pub mod transport;

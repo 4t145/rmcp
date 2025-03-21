@@ -1,11 +1,11 @@
 use anyhow::Result;
 use rmcp::{
-    ClientHandlerService,
+    ServiceExt,
     model::{
         CallToolRequestParam, GetPromptRequestParam, PaginatedRequestParam,
         ReadResourceRequestParam,
     },
-    object, serve_client,
+    object,
     transport::child_process::TokioChildProcess,
 };
 
@@ -25,15 +25,13 @@ async fn main() -> Result<()> {
         .init();
 
     // Start server
-    let service = serve_client(
-        ClientHandlerService::simple(),
-        TokioChildProcess::new(
+    let service = ()
+        .serve(TokioChildProcess::new(
             Command::new("npx")
                 .arg("-y")
                 .arg("@modelcontextprotocol/server-everything"),
-        )?,
-    )
-    .await?;
+        )?)
+        .await?;
 
     // Initialize
     let server_info = service.peer_info();
@@ -101,10 +99,11 @@ async fn main() -> Result<()> {
         .await?;
     tracing::info!("Prompt - complex: {prompt:#?}");
 
-    // // List resource templates
-    // // TODO: This works in MCP Inspector but not here. I think typescript-sdk needs to be updated in everything mcp server
-    // let resource_templates = service.list_resource_templates(PaginatedRequestParam { cursor: None }).await?;
-    // tracing::info!("Available resource templates: {resource_templates:#?}");
+    // List resource templates
+    let resource_templates = service
+        .list_resource_templates(PaginatedRequestParam { cursor: None })
+        .await?;
+    tracing::info!("Available resource templates: {resource_templates:#?}");
 
     service.cancel().await?;
 

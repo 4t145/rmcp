@@ -14,6 +14,7 @@
 # Transport Examples
 
 - [Tcp](transport/src/tcp.rs)
+- [Transport on http upgrade](transport/src/http_upgrade.rs)
 
 ## Use Mcp Inspector
 ```sh

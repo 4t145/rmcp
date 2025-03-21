@@ -542,7 +542,7 @@ const_string!(ListResourceTemplatesRequestMethod = "resources/templates/list");
 pub type ListResourceTemplatesRequest =
     Request<ListResourceTemplatesRequestMethod, PaginatedRequestParam>;
 paginated_result!(ListResourceTemplatesResult {
-    resource_templates: Vec<Resource>
+    resource_templates: Vec<ResourceTemplate>
 });
 
 const_string!(ReadResourceRequestMethod = "resources/read");
