@@ -15,6 +15,7 @@
 
 - [Tcp](transport/src/tcp.rs)
 - [Transport on http upgrade](transport/src/http_upgrade.rs)
+- [Unix Socket](transport/src/unix_socket.rs)
 
 ## Use Mcp Inspector
 ```sh
