@@ -3,6 +3,7 @@ use std::{borrow::Cow, sync::Arc};
 /// Tools represent a routine that a server can execute
 /// Tool calls represent requests from the client to execute one
 use serde::{Deserialize, Serialize};
+use serde_json::Value;
 
 use super::JsonObject;
 
@@ -31,5 +32,10 @@ impl Tool {
             description: description.into(),
             input_schema: input_schema.into(),
         }
+    }
+
+    /// Get the schema as json value
+    pub fn schema_as_json_value(&self) -> Value {
+        Value::Object(self.input_schema.as_ref().clone())
     }
 }

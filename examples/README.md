@@ -16,6 +16,11 @@
 - [Tcp](transport/src/tcp.rs)
 - [Transport on http upgrade](transport/src/http_upgrade.rs)
 
+
+# Intergration
+- [Rig](examples/rig-integration) A stream chatbot with rig
+
+
 ## Use Mcp Inspector
 ```sh
 npx @modelcontextprotocol/inspector
