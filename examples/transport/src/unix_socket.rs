@@ -66,7 +66,7 @@ async fn client() -> anyhow::Result<()> {
         let result = client
             .peer()
             .call_tool(rmcp::model::CallToolRequestParam {
-                name: sum_tool.name.clone().into(),
+                name: sum_tool.name.clone(),
                 arguments: Some(rmcp::object!({
                     "a": 10,
                     "b": 20
