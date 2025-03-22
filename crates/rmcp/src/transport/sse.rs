@@ -107,7 +107,7 @@ impl SseTransport {
         let response = response.error_for_status()?;
         match response.headers().get(reqwest::header::CONTENT_TYPE) {
             Some(ct) => {
-                if ct.as_bytes() != MIME_TYPE.as_bytes() {
+                if !ct.as_bytes().starts_with(MIME_TYPE.as_bytes()) {
                     return Err(SseTransportError::UnexpectedContentType(Some(ct.clone())));
                 }
             }
