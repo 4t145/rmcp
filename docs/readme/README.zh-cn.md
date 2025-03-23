@@ -23,7 +23,7 @@ rmcp = { git = "https://github.com/4t145/rmcp", branch = "dev" }
 ### 快速上手
 你可以用一行代码，启动一个SSE客户端
 ```rust
-use rmcp::{ServiceExt, transport::child_process::TokioChildProcess};
+use rmcp::{ServiceExt, transport::TokioChildProcess};
 use tokio::process::Command;
 
 let client = ().serve(

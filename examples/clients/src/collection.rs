@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use anyhow::Result;
 use rmcp::service::ServiceExt;
-use rmcp::{model::CallToolRequestParam, transport::child_process::TokioChildProcess};
+use rmcp::{model::CallToolRequestParam, transport::TokioChildProcess};
 
 use tokio::process::Command;
 use tracing_subscriber::layer::SubscriberExt;

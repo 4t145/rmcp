@@ -14,6 +14,14 @@ use tokio_util::{
 use crate::service::{RxJsonRpcMessage, ServiceRole, TxJsonRpcMessage};
 
 use super::IntoTransport;
+
+/// # StdIO Transport
+/// 
+/// Create a pair of [`tokio::io::Stdin`] and [`tokio::io::Stdout`].
+pub fn stdio() -> (tokio::io::Stdin, tokio::io::Stdout) {
+    (tokio::io::stdin(), tokio::io::stdout())
+}
+
 pub enum TransportAdapterAsyncRW {}
 
 impl<Role, R, W> IntoTransport<Role, std::io::Error, TransportAdapterAsyncRW> for (R, W)

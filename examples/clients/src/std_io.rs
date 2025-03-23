@@ -1,6 +1,6 @@
 use anyhow::Result;
 use rmcp::{
-    model::CallToolRequestParam, service::ServiceExt, transport::child_process::TokioChildProcess,
+    model::CallToolRequestParam, service::ServiceExt, transport::TokioChildProcess,
 };
 
 use tokio::process::Command;

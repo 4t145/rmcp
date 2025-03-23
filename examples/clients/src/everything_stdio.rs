@@ -6,7 +6,7 @@ use rmcp::{
         ReadResourceRequestParam,
     },
     object,
-    transport::child_process::TokioChildProcess,
+    transport::TokioChildProcess,
 };
 
 use tokio::process::Command;

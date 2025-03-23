@@ -1,6 +1,6 @@
 use anyhow::Result;
 use common::counter::Counter;
-use rmcp::ServiceExt;
+use rmcp::{ServiceExt, transport::stdio};
 
 use tracing_subscriber::{self, EnvFilter};
 mod common;
@@ -18,7 +18,7 @@ async fn main() -> Result<()> {
 
     // Create an instance of our counter router
     let service = Counter::new()
-        .serve((tokio::io::stdin(), tokio::io::stdout()))
+        .serve(stdio())
         .await
         .inspect_err(|e| {
             tracing::error!("serving error: {:?}", e);

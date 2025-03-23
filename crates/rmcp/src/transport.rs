@@ -43,18 +43,26 @@ use futures::{Sink, Stream};
 use crate::service::{RxJsonRpcMessage, ServiceRole, TxJsonRpcMessage};
 #[cfg(feature = "transport-child-process")]
 pub mod child_process;
+#[cfg(feature = "transport-child-process")]
+pub use ::TokioChildProcess;
 
 #[cfg(feature = "transport-io")]
 pub mod io;
+#[cfg(feature = "transport-io")]
+pub use io::stdio;
 
 #[cfg(feature = "transport-sse")]
 pub mod sse;
+#[cfg(feature = "transport-sse")]
+pub use sse::SseTransport;
 
 // #[cfg(feature = "tower")]
 // pub mod tower;
 
 #[cfg(feature = "transport-sse-server")]
 pub mod sse_server;
+#[cfg(feature = "transport-sse-server")]
+pub use sse_server::SseServer;
 
 // #[cfg(feature = "transport-ws")]
 // pub mod ws;

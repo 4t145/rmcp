@@ -27,7 +27,7 @@ rmcp = { git = "https://github.com/4t145/rmcp", branch = "dev" }
 ### Quick start
 Start a client in one line:
 ```rust
-use rmcp::{ServiceExt, transport::child_process::TokioChildProcess};
+use rmcp::{ServiceExt, transport::TokioChildProcess};
 use tokio::process::Command;
 
 let client = ().serve(

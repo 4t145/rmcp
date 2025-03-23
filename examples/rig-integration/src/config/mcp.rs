@@ -61,7 +61,7 @@ impl McpServerTransportConfig {
     pub async fn start(&self) -> anyhow::Result<RunningService<RoleClient, ()>> {
         let client = match self {
             McpServerTransportConfig::Sse { url } => {
-                let transport = rmcp::transport::sse::SseTransport::start(url).await?;
+                let transport = rmcp::transport::SseTransport::start(url).await?;
                 ().serve(transport).await?
             }
             McpServerTransportConfig::Stdio {
@@ -69,7 +69,7 @@ impl McpServerTransportConfig {
                 args,
                 envs,
             } => {
-                let transport = rmcp::transport::child_process::TokioChildProcess::new(
+                let transport = rmcp::transport::TokioChildProcess::new(
                     tokio::process::Command::new(command)
                         .args(args)
                         .envs(envs)

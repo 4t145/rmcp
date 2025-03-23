@@ -22,7 +22,7 @@ rmcp = { version = "0.1", features = ["server"] }
 
 Start a client in one line:
 ```rust,ignore
-# use rmcp::{ServiceExt, transport::child_process::TokioChildProcess};
+# use rmcp::{ServiceExt, transport::TokioChildProcess};
 # use tokio::process::Command;
 
 let client = ().serve(
