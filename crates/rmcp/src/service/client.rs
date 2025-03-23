@@ -34,22 +34,36 @@ impl ServiceRole for RoleClient {
 pub type ServerSink = Peer<RoleClient>;
 
 impl<S: Service<RoleClient>> ServiceExt<RoleClient> for S {
-    fn serve<T, E, A>(
+    fn serve_with_ct<T, E, A>(
         self,
         transport: T,
+        ct: CancellationToken,
     ) -> impl Future<Output = Result<RunningService<RoleClient, Self>, E>> + Send
     where
         T: IntoTransport<RoleClient, E, A>,
         E: std::error::Error + From<std::io::Error> + Send + Sync + 'static,
         Self: Sized,
     {
-        serve_client(self, transport)
+        serve_client_with_ct(self, transport, ct)
     }
 }
 
 pub async fn serve_client<S, T, E, A>(
     service: S,
     transport: T,
+) -> Result<RunningService<RoleClient, S>, E>
+where
+    S: Service<RoleClient>,
+    T: IntoTransport<RoleClient, E, A>,
+    E: std::error::Error + From<std::io::Error> + Send + Sync + 'static,
+{
+    serve_client_with_ct(service, transport, Default::default()).await
+}
+
+pub async fn serve_client_with_ct<S, T, E, A>(
+    service: S,
+    transport: T,
+    ct: CancellationToken,
 ) -> Result<RunningService<RoleClient, S>, E>
 where
     S: Service<RoleClient>,
@@ -106,7 +120,7 @@ where
         },
     ));
     sink.send(notification.into_json_rpc_message()).await?;
-    serve_inner(service, (sink, stream), initialize_result, id_provider).await
+    serve_inner(service, (sink, stream), initialize_result, id_provider, ct).await
 }
 
 macro_rules! method {

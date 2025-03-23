@@ -53,6 +53,12 @@ pub mod sse;
 // #[cfg(feature = "tower")]
 // pub mod tower;
 
+#[cfg(feature = "transport-sse-server")]
+pub mod sse_server;
+
+// #[cfg(feature = "transport-ws")]
+// pub mod ws;
+
 pub trait IntoTransport<R, E, A>: Send + 'static
 where
     R: ServiceRole,

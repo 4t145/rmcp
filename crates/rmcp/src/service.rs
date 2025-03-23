@@ -19,6 +19,7 @@ mod tower;
 pub use tower::*;
 
 use tokio_util::sync::CancellationToken;
+use tracing::instrument;
 #[derive(Error, Debug)]
 #[non_exhaustive]
 pub enum ServiceError {
@@ -106,6 +107,18 @@ pub trait ServiceExt<R: ServiceRole>: Service<R> + Sized {
     fn serve<T, E, A>(
         self,
         transport: T,
+    ) -> impl Future<Output = Result<RunningService<R, Self>, E>> + Send
+    where
+        T: IntoTransport<R, E, A>,
+        E: std::error::Error + From<std::io::Error> + Send + Sync + 'static,
+        Self: Sized,
+    {
+        Self::serve_with_ct(self, transport, Default::default())
+    }
+    fn serve_with_ct<T, E, A>(
+        self,
+        transport: T,
+        ct: CancellationToken,
     ) -> impl Future<Output = Result<RunningService<R, Self>, E>> + Send
     where
         T: IntoTransport<R, E, A>,
@@ -422,14 +435,32 @@ where
     T: IntoTransport<R, E, A>,
     E: std::error::Error + Send + Sync + 'static,
 {
-    serve_inner(service, transport, peer_info, Default::default()).await
+    serve_directly_with_ct(service, transport, peer_info, Default::default()).await
 }
 
+/// Use this function to skip initialization process
+pub async fn serve_directly_with_ct<R, S, T, E, A>(
+    service: S,
+    transport: T,
+    peer_info: R::PeerInfo,
+    ct: CancellationToken,
+) -> Result<RunningService<R, S>, E>
+where
+    R: ServiceRole,
+    S: Service<R>,
+    T: IntoTransport<R, E, A>,
+    E: std::error::Error + Send + Sync + 'static,
+{
+    serve_inner(service, transport, peer_info, Default::default(), ct).await
+}
+
+#[instrument(skip_all)]
 async fn serve_inner<R, S, T, E, A>(
     mut service: S,
     transport: T,
     peer_info: R::PeerInfo,
     id_provider: Arc<AtomicU32RequestIdProvider>,
+    ct: CancellationToken,
 ) -> Result<RunningService<R, S>, E>
 where
     R: ServiceRole,
@@ -459,7 +490,6 @@ where
 
     // let message_sink = tokio::sync::
     // let mut stream = std::pin::pin!(stream);
-    let ct = CancellationToken::new();
     let serve_loop_ct = ct.child_token();
     let peer_return: Peer<R> = peer.clone();
     let handle = tokio::spawn(async move {
