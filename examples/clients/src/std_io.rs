@@ -1,7 +1,5 @@
 use anyhow::Result;
-use rmcp::{
-    model::CallToolRequestParam, service::ServiceExt, transport::TokioChildProcess,
-};
+use rmcp::{model::CallToolRequestParam, service::ServiceExt, transport::TokioChildProcess};
 
 use tokio::process::Command;
 use tracing_subscriber::layer::SubscriberExt;

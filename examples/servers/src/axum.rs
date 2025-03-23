@@ -1,4 +1,4 @@
-use rmcp::{ServiceExt, transport::sse_server::SseServer};
+use rmcp::transport::sse_server::SseServer;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
 use tracing_subscriber::{self};
