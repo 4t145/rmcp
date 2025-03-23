@@ -628,6 +628,10 @@ where
                 }
             }
         };
+        let sink_close_result = sink.close().await;
+        if let Err(e) = sink_close_result {
+            tracing::error!(%e, "fail to close sink");
+        }
         tracing::info!(?quit_reason, "serve finished");
         quit_reason
     });
