@@ -22,6 +22,8 @@
 # Intergration
 - [Rig](examples/rig-integration) A stream chatbot with rig
 
+# WASI
+- [WASI-P2 runtime](examples/wasi) How it works with wasip2
 
 ## Use Mcp Inspector
 ```sh

@@ -15,6 +15,8 @@ use crate::service::{RxJsonRpcMessage, ServiceRole, TxJsonRpcMessage};
 
 use super::IntoTransport;
 
+
+#[cfg(feature = "transport-io")]
 /// # StdIO Transport
 ///
 /// Create a pair of [`tokio::io::Stdin`] and [`tokio::io::Stdout`].

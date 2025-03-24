@@ -46,7 +46,7 @@ pub mod child_process;
 #[cfg(feature = "transport-child-process")]
 pub use child_process::TokioChildProcess;
 
-#[cfg(feature = "transport-io")]
+#[cfg(feature = "transport-async-rw")]
 pub mod io;
 #[cfg(feature = "transport-io")]
 pub use io::stdio;

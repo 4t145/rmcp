@@ -57,12 +57,18 @@ rmcp-macros = { version = "0.1", workspace = true, optional = true }
 [features]
 default = ["base64", "macros", "server"]
 client = []
-server = ["transport-io", "dep:schemars"]
+server = ["transport-async-rw", "dep:schemars"]
 macros = ["dep:rmcp-macros", "dep:paste"]
 transport-sse = ["dep:reqwest", "dep:sse-stream", "dep:url"]
-transport-io = ["tokio/io-util", "tokio-util/codec"]
-transport-child-process = ["transport-io", "tokio/process"]
-transport-sse-server = ["transport-io", "dep:axum", "dep:rand", "dep:tokio-stream"]
+transport-async-rw = ["tokio/io-util", "tokio-util/codec"]
+transport-io = ["transport-async-rw", "tokio/io-std"]
+transport-child-process = ["transport-async-rw", "tokio/process"]
+transport-sse-server = [
+    "transport-async-rw",
+    "dep:axum",
+    "dep:rand",
+    "dep:tokio-stream",
+]
 # transport-ws = ["transport-io", "dep:tokio-tungstenite"]
 tower = ["dep:tower-service"]
 [dev-dependencies]
