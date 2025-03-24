@@ -13,7 +13,6 @@ All the features listed on specification would be implemented in this crate. And
 
 ## Usage
 
-
 ### Import
 ```toml
 rmcp = { version = "0.1", features = ["server"] }
@@ -23,6 +22,17 @@ rmcp = { version = "0.1", features = ["server"] }
 Start a client in one line:
 ```rust,ignore
 # use rmcp::{ServiceExt, transport::child_process::TokioChildProcess};
+# use tokio::process::Command;
+
+let client = ().serve(
+    TokioChildProcess::new(Command::new("npx").arg("-y").arg("@modelcontextprotocol/server-everything"))?
+).await?;
+```
+
+
+Start a client in one line:
+```rust,ignore
+# use rmcp::{ServiceExt, transport::TokioChildProcess};
 # use tokio::process::Command;
 
 let client = ().serve(
@@ -160,7 +170,12 @@ See [examples](https://github.com/4t145/rmcp/tree/release/examples/README.md)
 ### Features
 - `client`: use client side sdk
 - `server`: use server side sdk
-
+- `macros`: macros default
+#### Transports
+- `transport-io`: Server stdio transport
+- `transport-sse-server`: Server SSE transport
+- `transport-child-process`: Client stdio transport
+- `transport-sse`: Client sse transport
 
 ## Related Resources
 - [MCP Specification](https://spec.modelcontextprotocol.io/specification/2024-11-05/)

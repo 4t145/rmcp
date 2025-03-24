@@ -1,12 +1,12 @@
 [package]
 name = "mcp-server-examples"
-version = "0.1.4"
+version = "0.1.5"
 edition = "2024"
 publish = false
 
 [dependencies]
-rmcp= { path = "../../crates/rmcp", features = ["server"] }
-tokio = { version = "1", features = ["macros", "rt", "rt-multi-thread", "io-std"] }
+rmcp= { path = "../../crates/rmcp", features = ["server", "transport-sse-server", "transport-io"] }
+tokio = { version = "1", features = ["macros", "rt", "rt-multi-thread", "io-std", "signal"] }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 anyhow = "1.0"
@@ -17,7 +17,7 @@ tracing-subscriber = { version = "0.3", features = [
     "fmt",
 ] }
 futures = "0.3"
-rand = { version = "0.8" }
+rand = { version = "0.9" }
 axum = { version = "0.8", features = ["macros"] }
 schemars = { version = "0.8", optional = true }
 # [dev-dependencies.'cfg(target_arch="linux")'.dependencies]

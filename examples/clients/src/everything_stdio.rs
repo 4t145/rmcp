@@ -1,12 +1,9 @@
 use anyhow::Result;
 use rmcp::{
     ServiceExt,
-    model::{
-        CallToolRequestParam, GetPromptRequestParam, PaginatedRequestParam,
-        ReadResourceRequestParam,
-    },
+    model::{CallToolRequestParam, GetPromptRequestParam, ReadResourceRequestParam},
     object,
-    transport::child_process::TokioChildProcess,
+    transport::TokioChildProcess,
 };
 
 use tokio::process::Command;
@@ -38,9 +35,7 @@ async fn main() -> Result<()> {
     tracing::info!("Connected to server: {server_info:#?}");
 
     // List tools
-    let tools = service
-        .list_tools(PaginatedRequestParam { cursor: None })
-        .await?;
+    let tools = service.list_all_tools().await?;
     tracing::info!("Available tools: {tools:#?}");
 
     // Call tool echo
@@ -62,9 +57,7 @@ async fn main() -> Result<()> {
     tracing::info!("Tool result for longRunningOperation: {tool_result:#?}");
 
     // List resources
-    let resources = service
-        .list_resources(PaginatedRequestParam { cursor: None })
-        .await?;
+    let resources = service.list_all_resources().await?;
     tracing::info!("Available resources: {resources:#?}");
 
     // Read resource
@@ -76,9 +69,7 @@ async fn main() -> Result<()> {
     tracing::info!("Resource: {resource:#?}");
 
     // List prompts
-    let prompts = service
-        .list_prompts(PaginatedRequestParam { cursor: None })
-        .await?;
+    let prompts = service.list_all_prompts().await?;
     tracing::info!("Available prompts: {prompts:#?}");
 
     // Get simple prompt
@@ -100,9 +91,7 @@ async fn main() -> Result<()> {
     tracing::info!("Prompt - complex: {prompt:#?}");
 
     // List resource templates
-    let resource_templates = service
-        .list_resource_templates(PaginatedRequestParam { cursor: None })
-        .await?;
+    let resource_templates = service.list_all_resource_templates().await?;
     tracing::info!("Available resource templates: {resource_templates:#?}");
 
     service.cancel().await?;
