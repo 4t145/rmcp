@@ -1,10 +1,7 @@
 use anyhow::Result;
 use rmcp::{
     ServiceExt,
-    model::{
-        CallToolRequestParam, GetPromptRequestParam, PaginatedRequestParam,
-        ReadResourceRequestParam,
-    },
+    model::{CallToolRequestParam, GetPromptRequestParam, ReadResourceRequestParam},
     object,
     transport::TokioChildProcess,
 };
@@ -38,9 +35,7 @@ async fn main() -> Result<()> {
     tracing::info!("Connected to server: {server_info:#?}");
 
     // List tools
-    let tools = service
-        .list_all_tools()
-        .await?;
+    let tools = service.list_all_tools().await?;
     tracing::info!("Available tools: {tools:#?}");
 
     // Call tool echo
@@ -62,9 +57,7 @@ async fn main() -> Result<()> {
     tracing::info!("Tool result for longRunningOperation: {tool_result:#?}");
 
     // List resources
-    let resources = service
-        .list_all_resources()
-        .await?;
+    let resources = service.list_all_resources().await?;
     tracing::info!("Available resources: {resources:#?}");
 
     // Read resource
@@ -76,9 +69,7 @@ async fn main() -> Result<()> {
     tracing::info!("Resource: {resource:#?}");
 
     // List prompts
-    let prompts = service
-        .list_all_prompts()
-        .await?;
+    let prompts = service.list_all_prompts().await?;
     tracing::info!("Available prompts: {prompts:#?}");
 
     // Get simple prompt

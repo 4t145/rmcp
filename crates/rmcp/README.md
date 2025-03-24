@@ -160,7 +160,12 @@ See [examples](https://github.com/4t145/rmcp/tree/release/examples/README.md)
 ### Features
 - `client`: use client side sdk
 - `server`: use server side sdk
-
+- `macros`: macros default
+#### Transports
+- `transport-io`: Server stdio transport
+- `transport-sse-server`: Server SSE transport
+- `transport-child-process`: Client stdio transport
+- `transport-sse`: Client sse transport
 
 ## Related Resources
 - [MCP Specification](https://spec.modelcontextprotocol.io/specification/2024-11-05/)

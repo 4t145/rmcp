@@ -15,7 +15,6 @@ use crate::service::{RxJsonRpcMessage, ServiceRole, TxJsonRpcMessage};
 
 use super::IntoTransport;
 
-
 #[cfg(feature = "transport-io")]
 /// # StdIO Transport
 ///
