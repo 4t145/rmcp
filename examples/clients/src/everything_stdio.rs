@@ -39,7 +39,7 @@ async fn main() -> Result<()> {
 
     // List tools
     let tools = service
-        .list_tools(PaginatedRequestParam { cursor: None })
+        .list_all_tools()
         .await?;
     tracing::info!("Available tools: {tools:#?}");
 
