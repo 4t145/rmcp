@@ -1,14 +1,12 @@
 use rmcp::transport::sse_server::SseServer;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
-
-use tracing_subscriber::{self};
 mod common;
-use common::counter::Counter;
+use common::calculator::Calculator;
 
 const BIND_ADDRESS: &str = "127.0.0.1:8000";
 
-#[tokio::main]
-async fn main() -> anyhow::Result<()> {
+#[tokio::test]
+async fn test_with_js_client() -> anyhow::Result<()> {
     tracing_subscriber::registry()
         .with(
             tracing_subscriber::EnvFilter::try_from_default_env()
@@ -16,12 +14,23 @@ async fn main() -> anyhow::Result<()> {
         )
         .with(tracing_subscriber::fmt::layer())
         .init();
+    tokio::process::Command::new("npm")
+        .arg("install")
+        .current_dir("tests/test_with_js")
+        .spawn()?
+        .wait()
+        .await?;
 
     let ct = SseServer::serve(BIND_ADDRESS.parse()?)
         .await?
-        .with_service(Counter::new);
+        .with_service(Calculator::default);
 
-    tokio::signal::ctrl_c().await?;
+    let exit_status = tokio::process::Command::new("node")
+        .arg("tests/test_with_js/client.js")
+        .spawn()?
+        .wait()
+        .await?;
+    assert!(exit_status.success());
     ct.cancel();
     Ok(())
 }

@@ -1,6 +1,6 @@
 use anyhow::Result;
 use rmcp::model::{ClientCapabilities, ClientInfo, Implementation};
-use rmcp::{ServiceExt, model::CallToolRequestParam, transport::sse::SseTransport};
+use rmcp::{ServiceExt, model::CallToolRequestParam, transport::SseTransport};
 
 use tracing_subscriber::layer::SubscriberExt;
 use tracing_subscriber::util::SubscriberInitExt;

@@ -5,8 +5,8 @@ use crate::model::{
     GetPromptRequestParam, GetPromptResult, InitializeRequest, InitializedNotification,
     ListPromptsRequest, ListPromptsResult, ListResourceTemplatesRequest,
     ListResourceTemplatesResult, ListResourcesRequest, ListResourcesResult, ListToolsRequest,
-    ListToolsResult, PaginatedRequestParam, ProgressNotification, ProgressNotificationParam,
-    ReadResourceRequest, ReadResourceRequestParam, ReadResourceResult,
+    ListToolsResult, PaginatedRequestParam, PaginatedRequestParamInner, ProgressNotification,
+    ProgressNotificationParam, ReadResourceRequest, ReadResourceRequestParam, ReadResourceResult,
     RootsListChangedNotification, ServerInfo, ServerNotification, ServerRequest, ServerResult,
     SetLevelRequest, SetLevelRequestParam, SubscribeRequest, SubscribeRequestParam,
     UnsubscribeRequest, UnsubscribeRequestParam,
@@ -34,22 +34,36 @@ impl ServiceRole for RoleClient {
 pub type ServerSink = Peer<RoleClient>;
 
 impl<S: Service<RoleClient>> ServiceExt<RoleClient> for S {
-    fn serve<T, E, A>(
+    fn serve_with_ct<T, E, A>(
         self,
         transport: T,
+        ct: CancellationToken,
     ) -> impl Future<Output = Result<RunningService<RoleClient, Self>, E>> + Send
     where
         T: IntoTransport<RoleClient, E, A>,
         E: std::error::Error + From<std::io::Error> + Send + Sync + 'static,
         Self: Sized,
     {
-        serve_client(self, transport)
+        serve_client_with_ct(self, transport, ct)
     }
 }
 
 pub async fn serve_client<S, T, E, A>(
     service: S,
     transport: T,
+) -> Result<RunningService<RoleClient, S>, E>
+where
+    S: Service<RoleClient>,
+    T: IntoTransport<RoleClient, E, A>,
+    E: std::error::Error + From<std::io::Error> + Send + Sync + 'static,
+{
+    serve_client_with_ct(service, transport, Default::default()).await
+}
+
+pub async fn serve_client_with_ct<S, T, E, A>(
+    service: S,
+    transport: T,
+    ct: CancellationToken,
 ) -> Result<RunningService<RoleClient, S>, E>
 where
     S: Service<RoleClient>,
@@ -106,7 +120,7 @@ where
         },
     ));
     sink.send(notification.into_json_rpc_message()).await?;
-    serve_inner(service, (sink, stream), initialize_result, id_provider).await
+    serve_inner(service, (sink, stream), initialize_result, id_provider, ct).await
 }
 
 macro_rules! method {
@@ -200,7 +214,9 @@ impl Peer<RoleClient> {
         let mut tools = Vec::new();
         let mut cursor = None;
         loop {
-            let result = self.list_tools(PaginatedRequestParam { cursor }).await?;
+            let result = self
+                .list_tools(Some(PaginatedRequestParamInner { cursor }))
+                .await?;
             tools.extend(result.tools);
             cursor = result.next_cursor;
             if cursor.is_none() {
@@ -217,7 +233,9 @@ impl Peer<RoleClient> {
         let mut prompts = Vec::new();
         let mut cursor = None;
         loop {
-            let result = self.list_prompts(PaginatedRequestParam { cursor }).await?;
+            let result = self
+                .list_prompts(Some(PaginatedRequestParamInner { cursor }))
+                .await?;
             prompts.extend(result.prompts);
             cursor = result.next_cursor;
             if cursor.is_none() {
@@ -235,7 +253,7 @@ impl Peer<RoleClient> {
         let mut cursor = None;
         loop {
             let result = self
-                .list_resources(PaginatedRequestParam { cursor })
+                .list_resources(Some(PaginatedRequestParamInner { cursor }))
                 .await?;
             resources.extend(result.resources);
             cursor = result.next_cursor;
@@ -256,7 +274,7 @@ impl Peer<RoleClient> {
         let mut cursor = None;
         loop {
             let result = self
-                .list_resource_templates(PaginatedRequestParam { cursor })
+                .list_resource_templates(Some(PaginatedRequestParamInner { cursor }))
                 .await?;
             resource_templates.extend(result.resource_templates);
             cursor = result.next_cursor;

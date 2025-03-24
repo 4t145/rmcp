@@ -494,11 +494,12 @@ impl Implementation {
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Default)]
 #[serde(rename_all = "camelCase")]
-pub struct PaginatedRequestParam {
+pub struct PaginatedRequestParamInner {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub cursor: Option<String>,
 }
 
+pub type PaginatedRequestParam = Option<PaginatedRequestParamInner>;
 const_string!(PingRequestMethod = "ping");
 pub type PingRequest = RequestNoParam<PingRequestMethod>;
 

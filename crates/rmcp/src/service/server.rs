@@ -29,22 +29,36 @@ impl ServiceRole for RoleServer {
 pub type ClientSink = Peer<RoleServer>;
 
 impl<S: Service<RoleServer>> ServiceExt<RoleServer> for S {
-    fn serve<T, E, A>(
+    fn serve_with_ct<T, E, A>(
         self,
         transport: T,
+        ct: CancellationToken,
     ) -> impl Future<Output = Result<RunningService<RoleServer, Self>, E>> + Send
     where
         T: IntoTransport<RoleServer, E, A>,
         E: std::error::Error + From<std::io::Error> + Send + Sync + 'static,
         Self: Sized,
     {
-        serve_server(self, transport)
+        serve_server_with_ct(self, transport, ct)
     }
 }
 
 pub async fn serve_server<S, T, E, A>(
     service: S,
     transport: T,
+) -> Result<RunningService<RoleServer, S>, E>
+where
+    S: Service<RoleServer>,
+    T: IntoTransport<RoleServer, E, A>,
+    E: std::error::Error + From<std::io::Error> + Send + Sync + 'static,
+{
+    serve_server_with_ct(service, transport, CancellationToken::new()).await
+}
+
+pub async fn serve_server_with_ct<S, T, E, A>(
+    service: S,
+    transport: T,
+    ct: CancellationToken,
 ) -> Result<RunningService<RoleServer, S>, E>
 where
     S: Service<RoleServer>,
@@ -104,7 +118,7 @@ where
         )
         .into());
     };
-    serve_inner(service, (sink, stream), peer_info.params, id_provider).await
+    serve_inner(service, (sink, stream), peer_info.params, id_provider, ct).await
 }
 
 macro_rules! method {

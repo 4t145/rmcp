@@ -43,8 +43,8 @@ enum SseTransportState {
 
 #[derive(Debug, Clone, Copy, Hash, PartialEq, Eq)]
 pub struct SseTransportRetryCofnig {
-    max_times: Option<usize>,
-    min_duration: Duration,
+    pub max_times: Option<usize>,
+    pub min_duration: Duration,
 }
 impl SseTransportRetryCofnig {
     pub const DEFAULT_MIN_DURATION: Duration = Duration::from_millis(1000);
@@ -107,7 +107,7 @@ impl SseTransport {
         let response = response.error_for_status()?;
         match response.headers().get(reqwest::header::CONTENT_TYPE) {
             Some(ct) => {
-                if ct.as_bytes() != MIME_TYPE.as_bytes() {
+                if !ct.as_bytes().starts_with(MIME_TYPE.as_bytes()) {
                     return Err(SseTransportError::UnexpectedContentType(Some(ct.clone())));
                 }
             }
