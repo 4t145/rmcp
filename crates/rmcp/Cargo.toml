@@ -54,7 +54,6 @@ tokio-stream = { version = "0.1", optional = true }
 # macro
 rmcp-macros = { version = "0.1", workspace = true, optional = true }
 
-
 [features]
 default = ["base64", "macros", "server"]
 client = []
@@ -67,11 +66,15 @@ transport-sse-server = ["transport-io", "dep:axum", "dep:rand", "dep:tokio-strea
 # transport-ws = ["transport-io", "dep:tokio-tungstenite"]
 tower = ["dep:tower-service"]
 [dev-dependencies]
-tokio = { version = "1", features = ["sync", "macros", "io-util", "rt"] }
+tokio = { version = "1", features = ["full"] }
 schemars = { version = "0.8" }
 
 anyhow = "1.0"
-
+tracing-subscriber = { version = "0.3", features = [
+    "env-filter",
+    "std",
+    "fmt",
+] }
 [[test]]
 name = "test_tool_macros"
 required-features = ["server"]
