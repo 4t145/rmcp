@@ -8,8 +8,5 @@
         "schemars",
         "thiserror",
         "Wasi"
-    ],
-    "rust-analyzer.cargo.features": [
-        // "transport-sse-server",
     ]
 }
