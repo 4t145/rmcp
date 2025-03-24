@@ -68,7 +68,7 @@ async fn post_event_handler(
     Query(PostEventQuery { session_id }): Query<PostEventQuery>,
     Json(message): Json<ClientJsonRpcMessage>,
 ) -> Result<StatusCode, StatusCode> {
-    tracing::info!(session_id, ?message, "new client message");
+    tracing::debug!(session_id, ?message, "new client message");
     let tx = {
         let rg = app.txs.read().await;
         rg.get(session_id.as_str())

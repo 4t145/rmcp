@@ -5,8 +5,8 @@ use crate::model::{
     GetPromptRequestParam, GetPromptResult, InitializeRequest, InitializedNotification,
     ListPromptsRequest, ListPromptsResult, ListResourceTemplatesRequest,
     ListResourceTemplatesResult, ListResourcesRequest, ListResourcesResult, ListToolsRequest,
-    ListToolsResult, PaginatedRequestParam, ProgressNotification, ProgressNotificationParam,
-    ReadResourceRequest, ReadResourceRequestParam, ReadResourceResult,
+    ListToolsResult, PaginatedRequestParam, PaginatedRequestParamInner, ProgressNotification,
+    ProgressNotificationParam, ReadResourceRequest, ReadResourceRequestParam, ReadResourceResult,
     RootsListChangedNotification, ServerInfo, ServerNotification, ServerRequest, ServerResult,
     SetLevelRequest, SetLevelRequestParam, SubscribeRequest, SubscribeRequestParam,
     UnsubscribeRequest, UnsubscribeRequestParam,
@@ -214,7 +214,9 @@ impl Peer<RoleClient> {
         let mut tools = Vec::new();
         let mut cursor = None;
         loop {
-            let result = self.list_tools(PaginatedRequestParam { cursor }).await?;
+            let result = self
+                .list_tools(Some(PaginatedRequestParamInner { cursor }))
+                .await?;
             tools.extend(result.tools);
             cursor = result.next_cursor;
             if cursor.is_none() {
@@ -231,7 +233,9 @@ impl Peer<RoleClient> {
         let mut prompts = Vec::new();
         let mut cursor = None;
         loop {
-            let result = self.list_prompts(PaginatedRequestParam { cursor }).await?;
+            let result = self
+                .list_prompts(Some(PaginatedRequestParamInner { cursor }))
+                .await?;
             prompts.extend(result.prompts);
             cursor = result.next_cursor;
             if cursor.is_none() {
@@ -249,7 +253,7 @@ impl Peer<RoleClient> {
         let mut cursor = None;
         loop {
             let result = self
-                .list_resources(PaginatedRequestParam { cursor })
+                .list_resources(Some(PaginatedRequestParamInner { cursor }))
                 .await?;
             resources.extend(result.resources);
             cursor = result.next_cursor;
@@ -270,7 +274,7 @@ impl Peer<RoleClient> {
         let mut cursor = None;
         loop {
             let result = self
-                .list_resource_templates(PaginatedRequestParam { cursor })
+                .list_resource_templates(Some(PaginatedRequestParamInner { cursor }))
                 .await?;
             resource_templates.extend(result.resource_templates);
             cursor = result.next_cursor;

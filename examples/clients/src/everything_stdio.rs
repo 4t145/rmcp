@@ -63,7 +63,7 @@ async fn main() -> Result<()> {
 
     // List resources
     let resources = service
-        .list_resources(PaginatedRequestParam { cursor: None })
+        .list_all_resources()
         .await?;
     tracing::info!("Available resources: {resources:#?}");
 
@@ -77,7 +77,7 @@ async fn main() -> Result<()> {
 
     // List prompts
     let prompts = service
-        .list_prompts(PaginatedRequestParam { cursor: None })
+        .list_all_prompts()
         .await?;
     tracing::info!("Available prompts: {prompts:#?}");
 
@@ -100,9 +100,7 @@ async fn main() -> Result<()> {
     tracing::info!("Prompt - complex: {prompt:#?}");
 
     // List resource templates
-    let resource_templates = service
-        .list_resource_templates(PaginatedRequestParam { cursor: None })
-        .await?;
+    let resource_templates = service.list_all_resource_templates().await?;
     tracing::info!("Available resource templates: {resource_templates:#?}");
 
     service.cancel().await?;
