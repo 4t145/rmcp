@@ -85,3 +85,13 @@ tracing-subscriber = { version = "0.3", features = [
 name = "test_tool_macros"
 required-features = ["server"]
 path = "tests/test_tool_macros.rs"
+
+[[test]]
+name = "test_with_python"
+required-features = ["server", "transport-sse-server"]
+path = "tests/test_with_python.rs"
+
+[[test]]
+name = "test_with_js"
+required-features = ["server", "transport-sse-server"]
+path = "tests/test_with_js.rs"
