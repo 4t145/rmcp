@@ -243,7 +243,7 @@ impl SseServer {
             config,
         })
     }
-    pub fn with_mcp<S, F>(mut self, service_provider: F) -> CancellationToken
+    pub fn with_service<S, F>(mut self, service_provider: F) -> CancellationToken
     where
         S: Service<RoleServer>,
         F: Fn() -> S + Send + 'static,

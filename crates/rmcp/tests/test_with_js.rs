@@ -23,7 +23,7 @@ async fn test_with_js_client() -> anyhow::Result<()> {
 
     let ct = SseServer::serve(BIND_ADDRESS.parse()?)
         .await?
-        .with_mcp(Calculator::default);
+        .with_service(Calculator::default);
 
     let exit_status = tokio::process::Command::new("node")
         .arg("tests/test_with_js/client.js")
