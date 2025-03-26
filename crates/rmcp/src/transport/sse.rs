@@ -42,14 +42,14 @@ enum SseTransportState {
 }
 
 #[derive(Debug, Clone, Copy, Hash, PartialEq, Eq)]
-pub struct SseTransportRetryCofnig {
+pub struct SseTransportRetryConfig {
     pub max_times: Option<usize>,
     pub min_duration: Duration,
 }
-impl SseTransportRetryCofnig {
+impl SseTransportRetryConfig {
     pub const DEFAULT_MIN_DURATION: Duration = Duration::from_millis(1000);
 }
-impl Default for SseTransportRetryCofnig {
+impl Default for SseTransportRetryConfig {
     fn default() -> Self {
         Self {
             max_times: None,
@@ -72,7 +72,7 @@ pub struct SseTransport {
     recommended_retry_duration_ms: Option<u64>,
     #[allow(clippy::type_complexity)]
     request_queue: VecDeque<tokio::sync::oneshot::Receiver<Result<(), SseTransportError>>>,
-    pub retry_config: SseTransportRetryCofnig,
+    pub retry_config: SseTransportRetryConfig,
 }
 
 impl SseTransport {
