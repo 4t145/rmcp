@@ -402,7 +402,7 @@ impl<S> ToolBox<S> {
         self.map.insert(item.attr.name.clone(), item);
     }
 
-    pub fn remove<H, A>(&mut self, name: &str) {
+    pub fn remove(&mut self, name: &str) {
         self.map.remove(name);
     }
 
