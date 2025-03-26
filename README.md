@@ -2,6 +2,9 @@
 <a href="docs/readme/README.zh-cn.md">简体中文</a>
 </div>
 
+# **NOTICE**
+This crate may be merged into official sdk. Follow this [PR](https://github.com/modelcontextprotocol/rust-sdk/pull/44)
+
 # RMCP
 [![Crates.io Version](https://img.shields.io/crates/v/rmcp)](https://crates.io/crates/rmcp)
 ![Release status](https://github.com/4t145/rmcp/actions/workflows/release.yml/badge.svg)
