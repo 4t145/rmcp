@@ -3,7 +3,7 @@
 </div>
 
 # **NOTICE**
-This crate may be merged into official sdk. Follow this [PR](https://github.com/modelcontextprotocol/rust-sdk/pull/44)
+This crate was merged into [official sdk](https://github.com/modelcontextprotocol/rust-sdk/pulls). We will continue our development there.
 
 # RMCP
 [![Crates.io Version](https://img.shields.io/crates/v/rmcp)](https://crates.io/crates/rmcp)
